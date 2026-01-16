@@ -3,7 +3,7 @@
 ## Description
 
 L’EPIC 3 constitue tableau de bord des campagnes.
-Il permet à un utilisateur au travers de filtres de visualiser, créer des campagnes et de suivre l'évolution de celles déjà lancées
+Il permet à un utilisateur au travers de filtres de visualiser, créer des campagnes et de suivre l'évolution de celles déjà lancées.
 
 
 ## Objectifs
@@ -14,7 +14,7 @@ Il permet à un utilisateur au travers de filtres de visualiser, créer des camp
 
 ## Scénario principal
 
-Gigi Une fois connecté, accède à l'interfacge des campagnes.Il peut utiliser des filtres, consulter les chiffres et graphiques.
+Gigi Une fois connecté, accède à l'interfaçage des campagnes.Il peut utiliser des filtres, consulter les chiffres et graphiques.
 
 ## Liste des fonctionnalitées
 Fonctionnalité 1 – création des campagnes
