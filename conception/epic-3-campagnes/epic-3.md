@@ -29,13 +29,12 @@ Fonctionnalité 2 – overview ses campagnes en cours et passées
 - US7 – Affichage KPI
 
 Fonctionnalité 3 – page campagne
-- US – Acceder a differentes campagnes
-- US – 
-- US – Charger le csv en fonction du choix
-- US – Afficher les KPIs de la campagne en cours
-- US – Affichage du tableau de bord des tâches de la campagne
-- US – Naviguer entre les differents onglets
-- US – Export format PNG du tbleau de bord et subset
+- US1 – Acceder a differentes campagnes
+- US2 – Charger le csv en fonction du choix
+- US3 – Afficher les KPIs de la campagne en cours
+- US4 – Affichage du tableau de bord des tâches de la campagne
+- US5 – Naviguer entre les differents onglets
+- US6 – Export format PNG du tbleau de bord et subset
 
 Fonctionnalité 4 – mes campagnes
 - US1 – Selection de la section "campagnes"
