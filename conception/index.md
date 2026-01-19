@@ -89,29 +89,7 @@ Une fois la campagne prête, Gigi peut envoyer ses mails directement depuis l’
 
 > **Voir dossier : epic-5-chatbot-ia**
 
-## 4. Arborescence de la documentation
-/conception
- ├── index.md  (cette page)
- ├── epic-1-authentification-bdd
- │    ├── authentification.md
- │    ├── interface-bdd.md
- │    └── dashboard-bdd.md
- ├── epic-2-merging-csv
- │    └── merging-csv-use-case.md
- ├── epic-3-campagnes
- │    ├── creation-campagne.md
- │    ├── overview-campagnes.md
- │    ├── page-campagne.md
- │    └── kpis-campagne.md
- ├── epic-4-user-settings
- │    └── user-setting.md
- ├── epic-5-chatbot-ia
- │    ├── chatbot-initialisation.md
- │    ├── memoire-bot.md
- │    ├── clustering-explication.md
- └──  └── prompt-message.md
-
-## 5. Modèle de fiche Fonctionnalité
+## 4. Modèle de fiche Fonctionnalité
 
 Chaque fonctionnalité détaillée suit le même format :
 
