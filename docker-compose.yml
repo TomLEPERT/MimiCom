@@ -1,0 +1,78 @@
+# docker-compose.yml
+# Ce fichier décrit tous les "services" (conteneurs) nécessaires au projet.
+# Avec une seule commande (docker compose up), Docker lance tout :
+# - l'interface Streamlit (app)
+# - l'API FastAPI (api)
+# - le worker Celery (worker) pour les tâches longues
+# - la base de données MongoDB (mongodb)
+# - Redis (redis) qui sert de "boîte aux lettres" pour Celery
+
+services:
+  # 1) INTERFACE UTILISATEUR (Streamlit)
+  app:
+    build:
+      # "context" = dossier racine utilisé pour construire l'image Docker
+      context: .
+      # Dockerfile utilisé pour construire l'image de l'interface Streamlit
+      dockerfile: docker/Dockerfile.app
+    ports:
+      # "8501:8501" = on expose le port 8501 du conteneur sur le port 8501 de ta machine
+      # => l'app sera accessible sur http://localhost:8501
+      - "8501:8501"
+    env_file: .env
+    # env_file = charge les variables d'environnement depuis le fichier .env
+    # (ex: API_URL, etc.)
+    depends_on:
+      # depends_on = Docker démarre d'abord le service "api"
+      # Attention : ça ne garantit pas que l'API est "prête", juste qu'elle est lancée
+      - api
+
+  # 2) API (FastAPI) = logique métier + accès base de données
+  api:
+    build:
+      context: .
+      # Dockerfile utilisé pour construire l'image de l'API FastAPI
+      dockerfile: docker/Dockerfile.api
+    ports:
+      # API accessible sur http://localhost:8000
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      # L'API a besoin de MongoDB (données) et Redis (queue Celery)
+      - mongodb
+      - redis
+
+  # 3) WORKER (Celery) = exécute les tâches longues en arrière-plan
+  # Exemple : import CSV massif, clustering ML, génération de templates mails...
+  worker:
+    build:
+      context: .
+      # On réutilise le même Dockerfile que l'API, car le worker a besoin du même code Python
+      dockerfile: docker/Dockerfile.api
+    # Ici, on ne lance pas l'API : on lance le "worker Celery"
+    # -A ... = où trouver la configuration Celery (celery_app.py)
+    # worker = mode "travailleur"
+    command: celery -A app.tasks.celery_app.celery worker --loglevel=INFO
+    env_file: .env
+    depends_on:
+      # Celery a besoin de Redis (broker) et MongoDB (pour lire/écrire les résultats)
+      - redis
+      - mongodb
+
+  # 4) BASE DE DONNÉES (MongoDB)
+  mongodb:
+    # Image officielle MongoDB
+    image: mongo:7
+    ports:
+      # Permet d'accéder à MongoDB depuis ta machine (outil GUI ou terminal)
+      # MongoDB écoute sur le port 27017
+      - "27017:27017"
+    volumes:
+      # volume "mongo_data" = les données persistent_
+      - mongo_data:/data/db
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+volumes:
+  mongo_data: {}
