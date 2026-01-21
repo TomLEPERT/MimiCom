@@ -22,16 +22,19 @@ Puis le bot affiche la réponse
 
 ## Liste des fonctionnalitées
 
-Fonctionnalité – Afficher chatbot sur la page
-- US –
-- US –
-Fonctionnalité - Parametrage du prompt
-- US –
-- US –
-Fonctionnalité - Alimenter avec les elements de la campagne
-- US – 
-- US – 
-- US - 
+Fonctionnalité 1– Afficher chatbot sur la page
+- US1 – Visibilité du widget
+- US2 – Ouverture/fermeture
+
+Fonctionnalité 2- Parametrage du prompt
+
+- US3 – Definition du persona
+- US4 – Test en sandbox
+
+Fonctionnalité 3- Alimenter avec les elements de la campagne
+- US5 – Import de documents
+- US6 – Priorisation de la réponse
+- US7 - Gestion de la temporalité
 
 
 
