@@ -10,6 +10,7 @@ import os
 # - 27017          → port par défaut de MongoDB
 # - mimicom        → nom de la base de données utilisée
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://mongodb:27017/mimicom")
+MONGODB_DB = os.getenv("MONGODB_DB", "mimicom")
 
 # URL du "broker" Celery (la boîte aux lettres des tâches)
 # Ici, on utilise Redis comme broker

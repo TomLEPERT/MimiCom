@@ -5,7 +5,7 @@ from typing import Optional, Any
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator, model_validator
 
 # Helpers utilitaires pour normaliser et valider les données
-from app.utils.normalizers import normalize_str, normalize_phone, validate_phone
+from ..utils.normalizers import normalize_str, normalize_phone, validate_phone
 
 
 # -------------------------------------------------------------------
