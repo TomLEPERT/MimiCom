@@ -212,3 +212,11 @@ class ProspectUpdate(ProspectBase):
     # Sécurité : si le client envoie prospect_id dans le payload,
     # on l'ignore complètement.
     prospect_id: Optional[str] = Field(default=None, exclude=True)
+    
+# -------------------------------------------------------------------
+# Modèle utilisé en SORTIE API
+# -------------------------------------------------------------------
+class ProspectOut(ProspectBase):
+
+    # Identifiant unique du prospect
+    prospect_id: str
