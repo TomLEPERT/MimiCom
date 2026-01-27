@@ -111,10 +111,19 @@ En tant qu’utilisateur authentifié, je souhaite modifier les informations d�
     type_prospect
     pays
     region
-    region
     adresse
-    nb_followers
-    reseau_social
+    nb_aderents
+    facebook
+    facebook_followers
+    x
+    x_followers
+    instagram
+    instagram_followers
+    tictok
+    tictok_followers
+    youtube
+    youtube_followers
+    sit_web
     accepte_contact (bool)
     methode_contact
     contacte (bool)
