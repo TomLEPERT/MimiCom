@@ -5,7 +5,7 @@ from typing import Optional, Any
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator, model_validator
 
 # Helpers utilitaires pour normaliser et valider les données
-from app.utils.normalizers import normalize_str, normalize_phone, validate_phone
+from ..utils.normalizers import normalize_str, normalize_phone, validate_phone
 
 
 # -------------------------------------------------------------------
@@ -212,3 +212,11 @@ class ProspectUpdate(ProspectBase):
     # Sécurité : si le client envoie prospect_id dans le payload,
     # on l'ignore complètement.
     prospect_id: Optional[str] = Field(default=None, exclude=True)
+    
+# -------------------------------------------------------------------
+# Modèle utilisé en SORTIE API
+# -------------------------------------------------------------------
+class ProspectOut(ProspectBase):
+
+    # Identifiant unique du prospect
+    prospect_id: str
