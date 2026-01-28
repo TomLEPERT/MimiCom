@@ -1,4 +1,5 @@
 from .prospects import get_prospects_collection
+from .logs import get_logs_collection
 
 async def ensure_prospects_indexes():
     """
@@ -23,3 +24,15 @@ async def ensure_prospects_indexes():
         unique=True,
         background=True,
     )
+
+async def ensure_logs_indexes():
+    """
+    Index utiles sur la collection logs.
+    """
+    col = get_logs_collection()
+
+    # Pour retrouver rapidement les logs d'un prospect
+    await col.create_index([("prospect_id", 1), ("changed_at", -1)], name="logs_by_prospect")
+
+    # Pour filtrer par utilisateur
+    await col.create_index([("user", 1), ("changed_at", -1)], name="logs_by_user")

@@ -1,11 +1,17 @@
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Query, status
 from pymongo.errors import DuplicateKeyError
 from ..db.prospects import get_prospects_collection
 from ..models.prospect import ProspectCreate, ProspectOut, ProspectUpdate
 from ..utils.normalizers import normalize_email_for_db, normalize_phone_for_db
 from ..utils.mongo_serializers import serialize_prospect
+from ..db.logs import get_logs_collection
+from ..utils.diff import compute_diff
+from ..models.log import LogOut
+from ..utils.serializers import serialize_log
 
 
 # -------------------------------------------------------------------
@@ -250,18 +256,21 @@ async def update_prospect(
     force: bool = Query(default=False),
 ):
     """
-    Met à jour un prospect (mise à jour partielle).
+    Met à jour partiellement un prospect.
 
     Règles :
-    - prospect_id n'est jamais modifiable (même si le client tente)
-    - si email/téléphone changent → vérification doublon
-    - doublon + force=false → 409 + détails
-    - doublon + force=true → mise à jour autorisée (allow_duplicate=true)
-    - si prospect introuvable → 404
+    - prospect_id n'est jamais modifiable
+    - email/téléphone → contrôle des doublons
+    - doublon + force=false → 409
+    - doublon + force=true → update autorisée
+    - logs créés pour chaque champ réellement modifié
     """
+
     col = get_prospects_collection()
 
+    # ---------------------------------------------------------------
     # Vérifier que le prospect existe
+    # ---------------------------------------------------------------
     existing = await col.find_one({"prospect_id": prospect_id})
     if not existing:
         raise HTTPException(
@@ -269,13 +278,17 @@ async def update_prospect(
             detail="Prospect introuvable",
         )
 
-    # On récupère uniquement les champs réellement fournis par le client
+    # ---------------------------------------------------------------
+    # Récupérer uniquement les champs envoyés par le client
+    # ---------------------------------------------------------------
     updates: Dict[str, Any] = payload.model_dump(exclude_unset=True)
 
-    # Sécurité : même si "prospect_id" apparaît, on l'ignore
+    # Sécurité : on empêche toute modification du prospect_id
     updates.pop("prospect_id", None)
 
-    # Normalisation email/téléphone si présents dans la requête PATCH
+    # ---------------------------------------------------------------
+    # Normalisation email / téléphone (si fournis)
+    # ---------------------------------------------------------------
     email_norm: Optional[str] = None
     telephone_norm: Optional[str] = None
 
@@ -283,15 +296,14 @@ async def update_prospect(
     telephone_provided = "telephone" in updates
 
     if email_provided:
-        email_val = updates.get("email")
-        email_norm = normalize_email_for_db(email_val) if email_val else None
+        email_norm = normalize_email_for_db(updates.get("email"))
 
     if telephone_provided:
-        tel_val = updates.get("telephone")
-        telephone_norm = normalize_phone_for_db(tel_val) if tel_val else None
+        telephone_norm = normalize_phone_for_db(updates.get("telephone"))
 
-    # Vérification des doublons UNIQUEMENT si email/téléphone changent
-    # On exclut le prospect actuel de la recherche (prospect_id != celui-ci)
+    # ---------------------------------------------------------------
+    # Vérification des doublons (email / téléphone)
+    # ---------------------------------------------------------------
     or_filters: List[Dict[str, Any]] = []
 
     if email_provided and email_norm:
@@ -313,51 +325,47 @@ async def update_prospect(
         )
 
     if or_filters:
-        dup = await col.find_one(
+        duplicate = await col.find_one(
             {"$or": or_filters},
             {"prospect_id": 1, "email_norm": 1, "telephone_norm": 1},
         )
 
-        if dup:
-            # On précise quel champ est en conflit
+        if duplicate:
             fields = []
-            if email_provided and email_norm and dup.get("email_norm") == email_norm:
+            if email_norm and duplicate.get("email_norm") == email_norm:
                 fields.append("email")
-            if telephone_provided and telephone_norm and dup.get("telephone_norm") == telephone_norm:
+            if telephone_norm and duplicate.get("telephone_norm") == telephone_norm:
                 fields.append("telephone")
 
-            detail = {
-                "message": "Doublon détecté",
-                "fields": fields,
-                "existing_prospect_id": dup.get("prospect_id"),
-            }
-
-            # Si force=false → on bloque
             if not force:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "message": "Doublon détecté",
+                        "fields": fields,
+                        "existing_prospect_id": duplicate.get("prospect_id"),
+                    },
+                )
 
-            # Si force=true → on autorise en posant allow_duplicate=true
+            # force=true -> on autorise le doublon
             updates["allow_duplicate"] = True
 
-    # Préparer l'update Mongo proprement (set + unset)
+    # ---------------------------------------------------------------
+    # Préparer la mise à jour MongoDB
+    # ---------------------------------------------------------------
     set_doc: Dict[str, Any] = {}
     unset_doc: Dict[str, Any] = {}
 
-    # On copie les updates dans $set
     set_doc.update(updates)
 
-    # Si email fourni :
-    # - si email_norm existe → on set email_norm
-    # - sinon → on unset email_norm (pour qu'il ne participe plus aux index)
+    # email_norm
     if email_provided:
         if email_norm:
             set_doc["email_norm"] = email_norm
         else:
             unset_doc["email_norm"] = ""
 
-    # Si téléphone fourni :
-    # - si telephone_norm existe → on set telephone_norm
-    # - sinon → on unset telephone_norm
+    # telephone_norm
     if telephone_provided:
         if telephone_norm:
             set_doc["telephone_norm"] = telephone_norm
@@ -368,18 +376,55 @@ async def update_prospect(
     if unset_doc:
         mongo_update["$unset"] = unset_doc
 
+    # ---------------------------------------------------------------
     # Appliquer la mise à jour
+    # ---------------------------------------------------------------
     try:
-        result = await col.update_one({"prospect_id": prospect_id}, mongo_update)
+        await col.update_one({"prospect_id": prospect_id}, mongo_update)
     except DuplicateKeyError:
-        # Si l'index unique a bloqué au dernier moment
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={"message": "Doublon détecté (conflit d'insertion)"},
+            detail={"message": "Doublon détecté (conflit d'index)"},
         )
 
-    # Relire le document mis à jour et le renvoyer
+    # Relire le document mis à jour
     updated = await col.find_one({"prospect_id": prospect_id})
+
+    # ---------------------------------------------------------------
+    # LOGS — journalisation des modifications (Ticket 3.6)
+    # ---------------------------------------------------------------
+    if updates:
+        fields_to_log = list(updates.keys())
+
+        # Sécurité : on ne log jamais prospect_id
+        if "prospect_id" in fields_to_log:
+            fields_to_log.remove("prospect_id")
+
+        diffs = compute_diff(existing, updated, fields_to_log)
+
+        if diffs:
+            logs_col = get_logs_collection()
+            user = "system"  # placeholder MVP
+            now = datetime.now(timezone.utc)
+
+            log_docs = []
+            for field, old_val, new_val in diffs:
+                log_docs.append(
+                    {
+                        "prospect_id": prospect_id,
+                        "field": field,
+                        "old_value": old_val,
+                        "new_value": new_val,
+                        "changed_at": now,
+                        "user": user,
+                    }
+                )
+
+            await logs_col.insert_many(log_docs)
+
+    # ---------------------------------------------------------------
+    # Retour API
+    # ---------------------------------------------------------------
     return serialize_prospect(updated)
 
 # -------------------------------------------------------------------
@@ -406,3 +451,133 @@ async def delete_prospect(prospect_id: str):
 
     # 204 → pas de body
     return
+
+# -------------------------------------------------------------------
+# GET /prospects/{prospect_id}/logs
+# -------------------------------------------------------------------
+@router.get("/{prospect_id}/logs", response_model=List[LogOut], status_code=status.HTTP_200_OK)
+async def get_prospect_logs(
+    prospect_id: str,
+    # Nombre maximum de logs à retourner
+    # - par défaut : 50
+    # - minimum : 1
+    # - maximum : 200
+    limit: int = Query(default=50, ge=1, le=200),
+
+    # Nombre de logs à ignorer (pagination)
+    # ex: skip=50 -> page suivante
+    skip: int = Query(default=0, ge=0),
+):
+    """
+    Récupère les logs d'un prospect (triés du plus récent au plus ancien).
+
+    - 404 si le prospect n'existe pas
+    - pagination via skip/limit
+    """
+
+    # Récupère la collection MongoDB "prospects"
+    prospects_col = get_prospects_collection()
+
+    # Vérifie l'existence du prospect
+    # On ne récupère que le champ prospect_id
+    exists = await prospects_col.find_one(
+        {"prospect_id": prospect_id},
+        {"prospect_id": 1}
+    )
+
+    # Si le prospect n'existe pas -> erreur 404
+    if not exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prospect introuvable",
+        )
+
+    # Récupère la collection MongoDB "logs"
+    logs_col = get_logs_collection()
+
+    # Création de la requête Mongo :
+    # - uniquement les logs du prospect
+    # - triés du plus récent au plus ancien
+    # - pagination via skip/limit
+    cursor = (
+        logs_col.find({"prospect_id": prospect_id})
+        .sort("changed_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+
+    # Liste qui contiendra les logs finaux
+    logs: List[LogOut] = []
+
+    # Parcours asynchrone des documents Mongo
+    async for doc in cursor:
+        # serialize_log :
+        # - supprime _id
+        # - convertit les dates
+        # - rend le document JSON-compatible
+        logs.append(serialize_log(doc))
+
+    # Retourne la liste des logs
+    # FastAPI valide automatiquement avec LogOut
+    return logs
+
+
+# -------------------------------------------------------------------
+# GET /logs/all
+# -------------------------------------------------------------------
+@router.get("/logs/all", response_model=List[LogOut], status_code=status.HTTP_200_OK)
+async def list_logs(
+    # Pagination
+    limit: int = Query(default=50, ge=1, le=200),
+    skip: int = Query(default=0, ge=0),
+
+    # Filtres optionnels
+    user: Optional[str] = Query(default=None),        # utilisateur ayant fait la modif
+    field: Optional[str] = Query(default=None),       # champ modifié
+    prospect_id: Optional[str] = Query(default=None), # prospect concerné
+):
+    """
+    Récupère tous les logs (triés du plus récent au plus ancien).
+
+    Filtres optionnels :
+    - user
+    - field (nom du champ modifié)
+    - prospect_id
+    """
+
+    # Récupère la collection MongoDB "logs"
+    logs_col = get_logs_collection()
+
+    # Dictionnaire de filtres Mongo
+    query = {}
+
+    # Ajoute dynamiquement les filtres s'ils sont fournis
+    if user:
+        query["user"] = user
+
+    if field:
+        query["field"] = field
+
+    if prospect_id:
+        query["prospect_id"] = prospect_id
+
+    # Requête Mongo :
+    # - filtres dynamiques
+    # - tri décroissant par date
+    # - pagination
+    cursor = (
+        logs_col.find(query)
+        .sort("changed_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+
+    # Liste de sortie
+    logs: List[LogOut] = []
+
+    # Parcours des logs
+    async for doc in cursor:
+        logs.append(serialize_log(doc))
+
+    # Retourne la liste des logs
+    return logs
