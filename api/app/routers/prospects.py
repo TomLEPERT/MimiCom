@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 from datetime import datetime, timezone
+import re
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pymongo.errors import DuplicateKeyError
@@ -581,3 +582,163 @@ async def list_logs(
 
     # Retourne la liste des logs
     return logs
+
+@router.get("/search", response_model=List[ProspectOut], status_code=status.HTTP_200_OK)
+async def search_prospects(
+    # Recherche texte
+    nom: Optional[str] = Query(default=None),
+
+    type_prospect: Optional[str] = Query(default=None),
+    region: Optional[str] = Query(default=None),
+    departement: Optional[str] = Query(default=None),
+
+    statut: Optional[str] = Query(default=None),
+    accepte_contact: Optional[bool] = Query(default=None),
+
+    email: Optional[bool] = Query(default=None),
+    telephone: Optional[bool] = Query(default=None),
+    sit_web: Optional[bool] = Query(default=None),
+
+    # Filtres numériques
+    min_nb_aderents: Optional[int] = Query(default=None, ge=0),
+    max_nb_aderents: Optional[int] = Query(default=None, ge=0),
+
+    min_followers_total: Optional[int] = Query(default=None, ge=0),
+    max_followers_total: Optional[int] = Query(default=None, ge=0),
+
+    # Tri optionnel
+    sort_by: str = Query(default="nom_structure"),
+    sort_dir: str = Query(default="asc"),
+):
+    """
+    Recherche des prospects par filtres (sans pagination).
+
+    - 'nom' filtre sur nom_structure (regex, insensible à la casse)
+    - calcule nb_follower_total = max(facebook/x/instagram/youtube/tictok followers)
+    - ignore automatiquement les filtres non fournis (None)
+    """
+
+    col = get_prospects_collection()
+
+    # ------------------------------------------------------------
+    # Construction du filtre Mongo ($match)
+    # ------------------------------------------------------------
+    match: Dict[str, Any] = {}
+
+    # Filtre nom_structure (recherche partielle)
+    if nom:
+        pattern = re.escape(nom.strip())
+        match["nom_structure"] = {"$regex": pattern, "$options": "i"}
+
+    if type_prospect is not None:
+        match["type_prospect"] = type_prospect
+
+    if region is not None:
+        match["region"] = region
+
+    if departement is not None:
+        match["departement"] = departement
+
+    if statut is not None:
+        match["statut"] = statut
+
+    if accepte_contact is not None:
+        match["accepte_contact"] = accepte_contact
+
+    # Filtres exacts email/tel/site
+    def _present(field: str) -> Dict[str, Any]:
+        return {field: {"$exists": True, "$type": "string", "$ne": ""}}
+
+    def _missing(field: str) -> Dict[str, Any]:
+        return {"$or": [
+            {field: {"$exists": False}},
+            {field: None},
+            {field: ""},
+        ]}
+
+    # email bool
+    if email is True:
+        match.update(_present("email"))
+    elif email is False:
+        match["$and"] = match.get("$and", [])
+        match["$and"].append(_missing("email"))
+
+    # telephone bool
+    if telephone is True:
+        match.update(_present("telephone"))
+    elif telephone is False:
+        match["$and"] = match.get("$and", [])
+        match["$and"].append(_missing("telephone"))
+
+    # sit_web bool
+    if sit_web is True:
+        match.update(_present("sit_web"))
+    elif sit_web is False:
+        match["$and"] = match.get("$and", [])
+        match["$and"].append(_missing("sit_web"))
+
+    # nb_aderents min/max
+    if min_nb_aderents is not None or max_nb_aderents is not None:
+        match["nb_aderents"] = {}
+        if min_nb_aderents is not None:
+            match["nb_aderents"]["$gte"] = min_nb_aderents
+        if max_nb_aderents is not None:
+            match["nb_aderents"]["$lte"] = max_nb_aderents
+
+    # ------------------------------------------------------------
+    # Pipeline aggregation (calcul nb_follower_total)
+    # ------------------------------------------------------------
+    pipeline: List[Dict[str, Any]] = [
+        {"$match": match},
+        {
+            "$addFields": {
+                # max(...) en considérant None comme 0
+                "nb_follower_total": {
+                    "$max": [
+                        {"$ifNull": ["$facebook_followers", 0]},
+                        {"$ifNull": ["$x_followers", 0]},
+                        {"$ifNull": ["$instagram_followers", 0]},
+                        {"$ifNull": ["$youtube_followers", 0]},
+                        {"$ifNull": ["$tictok_followers", 0]},
+                    ]
+                }
+            }
+        },
+    ]
+
+    # Filtre min/max sur nb_follower_total (champ calculé)
+    if min_followers_total is not None or max_followers_total is not None:
+        cond: Dict[str, Any] = {}
+        if min_followers_total is not None:
+            cond["$gte"] = min_followers_total
+        if max_followers_total is not None:
+            cond["$lte"] = max_followers_total
+        pipeline.append({"$match": {"nb_follower_total": cond}})
+
+    # ------------------------------------------------------------
+    # Tri
+    # ------------------------------------------------------------
+    allowed_sort = {
+        "nom_structure",
+        "type_prospect",
+        "region",
+        "departement",
+        "nb_aderents",
+        "nb_follower_total",
+    }
+    if sort_by not in allowed_sort:
+        sort_by = "nom_structure"
+
+    direction = 1 if sort_dir.lower() == "asc" else -1
+    pipeline.append({"$sort": {sort_by: direction}})
+
+    # ------------------------------------------------------------
+    # Exécution + sérialisation
+    # ------------------------------------------------------------
+    results: List[Dict[str, Any]] = []
+    cursor = col.aggregate(pipeline)
+
+    async for doc in cursor:
+        results.append(serialize_prospect(doc))
+
+    return results
