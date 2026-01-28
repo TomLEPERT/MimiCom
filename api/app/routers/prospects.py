@@ -1,9 +1,9 @@
-from typing import List
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Query, status
 from pymongo.errors import DuplicateKeyError
 from ..db.prospects import get_prospects_collection
-from ..models.prospect import ProspectCreate, ProspectOut
+from ..models.prospect import ProspectCreate, ProspectOut, ProspectUpdate
 from ..utils.normalizers import normalize_email_for_db, normalize_phone_for_db
 from ..utils.mongo_serializers import serialize_prospect
 
@@ -239,3 +239,170 @@ async def get_prospects_by_ids(
         prospects.append(serialize_prospect(doc))
 
     return prospects
+
+# -------------------------------------------------------------------
+# Endpoint PATCH /prospects/{prospect_id}
+# -------------------------------------------------------------------
+@router.patch("/{prospect_id}", response_model=ProspectOut, status_code=status.HTTP_200_OK)
+async def update_prospect(
+    prospect_id: str,
+    payload: ProspectUpdate,
+    force: bool = Query(default=False),
+):
+    """
+    Met à jour un prospect (mise à jour partielle).
+
+    Règles :
+    - prospect_id n'est jamais modifiable (même si le client tente)
+    - si email/téléphone changent → vérification doublon
+    - doublon + force=false → 409 + détails
+    - doublon + force=true → mise à jour autorisée (allow_duplicate=true)
+    - si prospect introuvable → 404
+    """
+    col = get_prospects_collection()
+
+    # Vérifier que le prospect existe
+    existing = await col.find_one({"prospect_id": prospect_id})
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prospect introuvable",
+        )
+
+    # On récupère uniquement les champs réellement fournis par le client
+    updates: Dict[str, Any] = payload.model_dump(exclude_unset=True)
+
+    # Sécurité : même si "prospect_id" apparaît, on l'ignore
+    updates.pop("prospect_id", None)
+
+    # Normalisation email/téléphone si présents dans la requête PATCH
+    email_norm: Optional[str] = None
+    telephone_norm: Optional[str] = None
+
+    email_provided = "email" in updates
+    telephone_provided = "telephone" in updates
+
+    if email_provided:
+        email_val = updates.get("email")
+        email_norm = normalize_email_for_db(email_val) if email_val else None
+
+    if telephone_provided:
+        tel_val = updates.get("telephone")
+        telephone_norm = normalize_phone_for_db(tel_val) if tel_val else None
+
+    # Vérification des doublons UNIQUEMENT si email/téléphone changent
+    # On exclut le prospect actuel de la recherche (prospect_id != celui-ci)
+    or_filters: List[Dict[str, Any]] = []
+
+    if email_provided and email_norm:
+        or_filters.append(
+            {
+                "email_norm": email_norm,
+                "allow_duplicate": {"$ne": True},
+                "prospect_id": {"$ne": prospect_id},
+            }
+        )
+
+    if telephone_provided and telephone_norm:
+        or_filters.append(
+            {
+                "telephone_norm": telephone_norm,
+                "allow_duplicate": {"$ne": True},
+                "prospect_id": {"$ne": prospect_id},
+            }
+        )
+
+    if or_filters:
+        dup = await col.find_one(
+            {"$or": or_filters},
+            {"prospect_id": 1, "email_norm": 1, "telephone_norm": 1},
+        )
+
+        if dup:
+            # On précise quel champ est en conflit
+            fields = []
+            if email_provided and email_norm and dup.get("email_norm") == email_norm:
+                fields.append("email")
+            if telephone_provided and telephone_norm and dup.get("telephone_norm") == telephone_norm:
+                fields.append("telephone")
+
+            detail = {
+                "message": "Doublon détecté",
+                "fields": fields,
+                "existing_prospect_id": dup.get("prospect_id"),
+            }
+
+            # Si force=false → on bloque
+            if not force:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+            # Si force=true → on autorise en posant allow_duplicate=true
+            updates["allow_duplicate"] = True
+
+    # Préparer l'update Mongo proprement (set + unset)
+    set_doc: Dict[str, Any] = {}
+    unset_doc: Dict[str, Any] = {}
+
+    # On copie les updates dans $set
+    set_doc.update(updates)
+
+    # Si email fourni :
+    # - si email_norm existe → on set email_norm
+    # - sinon → on unset email_norm (pour qu'il ne participe plus aux index)
+    if email_provided:
+        if email_norm:
+            set_doc["email_norm"] = email_norm
+        else:
+            unset_doc["email_norm"] = ""
+
+    # Si téléphone fourni :
+    # - si telephone_norm existe → on set telephone_norm
+    # - sinon → on unset telephone_norm
+    if telephone_provided:
+        if telephone_norm:
+            set_doc["telephone_norm"] = telephone_norm
+        else:
+            unset_doc["telephone_norm"] = ""
+
+    mongo_update: Dict[str, Any] = {"$set": set_doc}
+    if unset_doc:
+        mongo_update["$unset"] = unset_doc
+
+    # Appliquer la mise à jour
+    try:
+        result = await col.update_one({"prospect_id": prospect_id}, mongo_update)
+    except DuplicateKeyError:
+        # Si l'index unique a bloqué au dernier moment
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": "Doublon détecté (conflit d'insertion)"},
+        )
+
+    # Relire le document mis à jour et le renvoyer
+    updated = await col.find_one({"prospect_id": prospect_id})
+    return serialize_prospect(updated)
+
+# -------------------------------------------------------------------
+# Endpoint DELETE /prospects/{prospect_id}
+# -------------------------------------------------------------------
+@router.delete("/{prospect_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_prospect(prospect_id: str):
+    """
+    Supprime un prospect via son prospect_id.
+
+    - Si le prospect n'existe pas : 404
+    - Sinon : suppression + 204 No Content
+    """
+    col = get_prospects_collection()
+
+    res = await col.delete_one({"prospect_id": prospect_id})
+
+    # delete_one renvoie deleted_count = 0 si rien n'a été supprimé
+    if res.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prospect introuvable",
+        )
+
+    # 204 → pas de body
+    return
