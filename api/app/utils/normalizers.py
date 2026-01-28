@@ -73,6 +73,6 @@ def normalize_phone_for_db(phone: Optional[str]) -> Optional[str]:
     if phone is None:
         return None
     p = phone.strip()
-    # supprime tous les espaces (et pas juste les doubles)
+    # supprime tous les espaces
     p = re.sub(r"\s+", "", p)
     return p if p != "" else None
