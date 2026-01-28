@@ -7,23 +7,19 @@ async def ensure_prospects_indexes():
     """
     prospects_col = get_prospects_collection()
 
-    # Index unique partiel sur email_norm
+    # Index unique partiel sur email_norm, appliqué seulement si allow_duplicate != True
     await prospects_col.create_index(
-        [("email_norm", 1)],
-        name="uniq_email_norm",
+        [("email_unique_key", 1)],
+        name="uniq_email_key",
         unique=True,
-        partialFilterExpression={
-            "email_norm": {"$exists": True, "$type": "string", "$gt": ""}
-        },
+        background=True,
     )
 
 
-    # Index unique partiel sur telephone_norm
+    # Index unique partiel sur telephone_norm, appliqué seulement si allow_duplicate != True
     await prospects_col.create_index(
-        [("telephone_norm", 1)],
-        name="uniq_telephone_norm",
+        [("telephone_unique_key", 1)],
+        name="uniq_telephone_key",
         unique=True,
-        partialFilterExpression={
-            "telephone_norm": {"$exists": True, "$type": "string", "$gt": ""}
-        },
+        background=True,
     )
