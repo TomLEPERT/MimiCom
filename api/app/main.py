@@ -3,7 +3,7 @@ from fastapi import FastAPI
 # Importe le "router" défini dans le fichier health.py
 # On le renomme en health_router pour plus de clarté
 from .routers.health import router as health_router
-from .db.indexes import ensure_prospects_indexes
+from .db.indexes import ensure_prospects_indexes, ensure_logs_indexes
 from .routers.prospects import router as prospects_router
 
 # Crée une instance de l'application FastAPI
@@ -22,3 +22,4 @@ async def startup():
     Actions exécutées au démarrage de l'API.
     """
     await ensure_prospects_indexes()
+    await ensure_logs_indexes()
