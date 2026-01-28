@@ -23,3 +23,4 @@ if st.button("Ping API"):
         st.error(str(e))
         
 
+st.sidebar
