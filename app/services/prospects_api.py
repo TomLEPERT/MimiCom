@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 
-from .request import request
+from services.request import request
 
 
 # -------------------------------------------------------------------

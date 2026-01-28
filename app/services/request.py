@@ -1,8 +1,8 @@
 from typing import Any, Dict, Optional, Tuple
 import requests
 
-from ..config import API_URL, DEFAULT_TIMEOUT_SECONDS
-from ..utils.error import make_error
+from config import API_URL, DEFAULT_TIMEOUT_SECONDS
+from utils.error import make_error
 
 # -------------------------------------------------------------------
 # Request API
