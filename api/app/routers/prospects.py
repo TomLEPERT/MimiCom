@@ -1,9 +1,11 @@
+from typing import List
 from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Query, status
 from pymongo.errors import DuplicateKeyError
 from ..db.prospects import get_prospects_collection
 from ..models.prospect import ProspectCreate, ProspectOut
 from ..utils.normalizers import normalize_email_for_db, normalize_phone_for_db
+from ..utils.mongo_serializers import serialize_prospect
 
 
 # -------------------------------------------------------------------
@@ -163,3 +165,77 @@ async def create_prospect(payload: ProspectCreate, force: bool = Query(default=F
     # Réponse HTTP 201 : prospect créé
     # ----------------------------------------------------------------
     return doc
+
+# -------------------------------------------------------------------
+# Endpoint GET /prospects/{prospect_id}
+# -------------------------------------------------------------------
+@router.get("/{prospect_id}", response_model=ProspectOut, status_code=status.HTTP_200_OK)
+async def get_prospect(prospect_id: str):
+    """
+    Récupère un prospect via son prospect_id (UUID).
+    - Si introuvable : 404
+    - Sinon : retourne toutes les infos (sans _id)
+    """
+    # Récupère la collection MongoDB "prospects"
+    col = get_prospects_collection()
+
+    # Recherche d'un document Mongo dont le champ "prospect_id"
+    doc = await col.find_one({"prospect_id": prospect_id})
+    # Si aucun document n'est trouvé
+    if not doc:
+        # On renvoie une erreur HTTP 404 (Not Found)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prospect introuvable",
+        )
+
+    # Si le prospect existe :
+    # - on nettoie le document Mongo (suppression de _id, champs techniques)
+    # - FastAPI valide automatiquement la réponse avec ProspectOut
+    return serialize_prospect(doc)
+
+# -------------------------------------------------------------------
+# Endpoint GET /prospects/
+# -------------------------------------------------------------------
+@router.get("", response_model=List[ProspectOut], status_code=status.HTTP_200_OK)
+async def list_prospects():
+    """
+    Récupère la liste complète des prospects.
+
+    - Retourne une liste (vide si aucun prospect)
+    - Supprime les champs internes Mongo
+    """
+
+    # Récupère la collection MongoDB "prospects"
+    col = get_prospects_collection()
+
+    # Récupère tous les documents Mongo
+    cursor = col.find({})
+
+    prospects = []
+    async for doc in cursor:
+        prospects.append(serialize_prospect(doc))
+
+    return prospects
+
+# -------------------------------------------------------------------
+# Endpoint GET /prospects/by-ids?ids=uuid1&ids=uuid2&ids=uuid3
+# -------------------------------------------------------------------
+@router.get("/by-ids", response_model=List[ProspectOut])
+async def get_prospects_by_ids(
+    ids: List[str] = Query(...)
+):
+    """
+    Récupère une liste de prospects à partir d'une liste de prospect_id.
+    """
+    # Récupère la collection MongoDB "prospects"
+    col = get_prospects_collection()
+
+    # Recherche d'un document Mongo dont le champ correspond une liste des ids
+    cursor = col.find({"prospect_id": {"$in": ids}})
+
+    prospects = []
+    async for doc in cursor:
+        prospects.append(serialize_prospect(doc))
+
+    return prospects
