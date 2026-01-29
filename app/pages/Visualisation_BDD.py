@@ -1,9 +1,10 @@
 import streamlit as st
 
-from services.prospects_api import list_prospects, get_prospect, delete_prospect
+from services.prospects_api import list_prospects, get_prospect, delete_prospect, search_prospects
 from components.prospects_table import render_prospects_table
 from components.prospect_card import render_prospect_card
 from components.prospect_inline_edit import render_prospect_inline_edit
+from components.prospects_filters import render_prospects_filters
 
 
 # ------------------------------------------------------------
@@ -62,17 +63,28 @@ def stop_edit():
     """Stopper l'édition inline."""
     st.session_state.bdd_edit_id = None
 
+# ------------------------------------------------------------
+# FILTRES (nom + email + telephone)
+# ------------------------------------------------------------
+filters = render_prospects_filters(
+    key="bdd",
+    fields=["nom", "email", "telephone"],
+    show_sort=True,
+)
 
 # ------------------------------------------------------------
-# Chargement de la liste (source unique)
+# Chargement de la liste (GET ou SEARCH selon filtres)
 # ------------------------------------------------------------
-data, err = list_prospects()
+if filters:
+    data, err = search_prospects(**filters)
+else:
+    data, err = list_prospects()
+
 if err:
     st.error(err.get("message", "Erreur chargement prospects"))
     st.stop()
 
 prospects = data or []
-
 
 # ------------------------------------------------------------
 # MODE VIEW : on cache le tableau, on affiche la fiche
