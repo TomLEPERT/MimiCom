@@ -21,3 +21,37 @@ if st.button("Ping API"):
         # Si l'API est inaccessible ou renvoie une erreur :
         # on affiche le message d'erreur en rouge dans l'interface
         st.error(str(e))
+        
+#-------- LOGIN -----------------
+def login_page():
+    st.title("Connexion")
+    st.write("Identifiant")
+
+    # saisie de l'utilisateur
+    email = st.text_input("Email")
+    password = st.text_input("Mot de passe", type="password")
+
+    # si l'utilisateur clique sur le bouton
+    if st.button("Se connecter"):
+        
+        # verif si champ vide
+        if not email or not password:
+            st.error("Veuillez remplir les champs obligatoires")
+        else:
+            # si champs ok ouvrir la connexion
+            st.success(f"Connexion pour : {email}")
+
+            # AJOUT DES DEUX BOUTONS
+            st.write("---") # Une ligne de séparation
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("Acces prospect"):
+                    st.write("Action : Ajouter un prospect")
+            
+            with col2:
+                if st.button("Acces BDD"):
+                    st.write("Action : Acceder a la BDD")
+
+if __name__ == "__main__":
+    login_page()
