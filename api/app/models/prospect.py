@@ -220,3 +220,6 @@ class ProspectOut(ProspectBase):
 
     # Identifiant unique du prospect
     prospect_id: str
+    
+    # Champ calculé (utilisé par /search)
+    nb_follower_total: Optional[int] = None

@@ -171,3 +171,5 @@ PAYS_OPTIONS = [
     "Royaume-Uni",
     "Autre",
 ]
+
+TRI_BOOL = [None, True, False]
