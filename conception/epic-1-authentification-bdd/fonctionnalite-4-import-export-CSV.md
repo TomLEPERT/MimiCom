@@ -54,10 +54,19 @@ Le fichier doit contenir au minimum les colonnes suivantes :
     type_prospect
     pays
     region
-    region
     adresse
-    nb_followers
-    reseau_social
+    nb_aderents
+    facebook
+    facebook_followers
+    x
+    x_followers
+    instagram
+    instagram_followers
+    tictok
+    tictok_followers
+    youtube
+    youtube_followers
+    sit_web
     accepte_contact (bool)
     methode_contact
     contacte (bool)

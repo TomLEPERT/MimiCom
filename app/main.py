@@ -23,6 +23,7 @@ if st.button("Ping API"):
         # on affiche le message d'erreur en rouge dans l'interface
         st.error(str(e))
         
+
 # ajout louisa router/login
 from fastapi import FastAPI
 from routers import login 
@@ -31,3 +32,6 @@ app.include_router(login.router)
 @app.get("/")
 def read_root():
     return {"message": "L'API est en ligne"}
+
+st.sidebar
+
