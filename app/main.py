@@ -21,3 +21,6 @@ if st.button("Ping API"):
         # Si l'API est inaccessible ou renvoie une erreur :
         # on affiche le message d'erreur en rouge dans l'interface
         st.error(str(e))
+        
+
+st.sidebar
