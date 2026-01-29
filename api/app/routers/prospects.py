@@ -33,16 +33,25 @@ async def create_prospect(payload: ProspectCreate, force: bool = Query(default=F
 
     - payload : données envoyées par le client (validées par Pydantic)
     - force : paramètre optionnel dans l'URL (?force=true)
-    
+
     Comportement :
     - Si un doublon email/téléphone est détecté et force=false :
-        → renvoie 409 + détails
+        -> renvoie 409 + détails
     - Si force=true :
-        → crée quand même (en bypassant l'unicité via allow_duplicate=true)
+        -> crée quand même (en bypassant l'unicité via allow_duplicate=true)
     """
 
     # Récupère la collection MongoDB "prospects"
     col = get_prospects_collection()
+
+    # On convertit le modèle Pydantic en dict Python
+    doc = payload.model_dump()
+
+    # IMPORTANT : on supprime les champs à None pour éviter les faux doublons "null"
+    doc = {k: v for k, v in doc.items() if v is not None}
+
+    # Génère un identifiant unique côté backend
+    doc["prospect_id"] = str(uuid4())
 
     # ----------------------------------------------------------------
     # Normalisation pour la détection de doublons / index Mongo
@@ -52,154 +61,80 @@ async def create_prospect(payload: ProspectCreate, force: bool = Query(default=F
     #   "06 12 34 56 78" → "0612345678"
     email_norm = normalize_email_for_db(payload.email) if payload.email else None
     telephone_norm = normalize_phone_for_db(payload.telephone) if payload.telephone else None
-    
-    doc["email_norm"] = email_norm
-    doc["telephone_norm"] = telephone_norm
+
+    # IMPORTANT :
+    # - si email_norm / telephone_norm est None, on NE DOIT PAS les stocker en base
+    if email_norm:
+        doc["email_norm"] = email_norm
+    if telephone_norm:
+        doc["telephone_norm"] = telephone_norm
+
     doc["allow_duplicate"] = bool(force)
-    
+
     # clés utilisées par les index uniques
     # - si force=false => clé = valeur normalisée => unicité
     # - si force=true  => clé = valeur unique random => bypass unicité
-    doc["email_unique_key"] = (
-        email_norm if (email_norm and not force) else (f"FORCED:{uuid4()}" if email_norm else None)
-    )
-
-    doc["telephone_unique_key"] = (
-        telephone_norm if (telephone_norm and not force) else (f"FORCED:{uuid4()}" if telephone_norm else None)
-    )
+    # IMPORTANT : on ne met PAS ces champs si la valeur source est vide / None
+    if email_norm:
+        doc["email_unique_key"] = email_norm if not force else f"FORCED:{uuid4()}"
+    if telephone_norm:
+        doc["telephone_unique_key"] = telephone_norm if not force else f"FORCED:{uuid4()}"
 
     # ----------------------------------------------------------------
     # Construction des filtres pour détecter un doublon
     # ----------------------------------------------------------------
-    # On va créer une requête Mongo du type :
-    #   { "$or": [ {email_norm: ...}, {telephone_norm: ...} ] }
-    # mais seulement pour les champs fournis
     or_filters = []
 
-    # Si un email est fourni → on cherche un prospect avec le même email_norm
-    # allow_duplicate != True → on ignore les prospects "forcés"
+    # Si un email est fourni -> on cherche un prospect avec le même email_norm
+    # allow_duplicate != True -> on ignore les prospects "forcés"
     if email_norm:
-        or_filters.append({
-            "email_norm": email_norm,
-            "allow_duplicate": {"$ne": True}
-        })
+        or_filters.append({"email_norm": email_norm, "allow_duplicate": {"$ne": True}})
 
-    # Si un téléphone est fourni → idem
+    # Si un téléphone est fourni -> idem
     if telephone_norm:
-        or_filters.append({
-            "telephone_norm": telephone_norm,
-            "allow_duplicate": {"$ne": True}
-        })
+        or_filters.append({"telephone_norm": telephone_norm, "allow_duplicate": {"$ne": True}})
 
     # ----------------------------------------------------------------
     # Vérification des doublons AVANT insertion
     # ----------------------------------------------------------------
-    duplicate_info = None
-
-    # On ne fait la requête que si on a au moins un filtre
     if or_filters:
         existing = await col.find_one(
             {"$or": or_filters},
-            {"prospect_id": 1, "email_norm": 1, "telephone_norm": 1}
+            {"prospect_id": 1, "email_norm": 1, "telephone_norm": 1},
         )
 
-        if existing:
-            # On détermine quel champ est en conflit
+        if existing and not force:
             fields = []
-
-            if email_norm and existing.get("email_norm") == email_norm:
+            if email_norm and email_norm == existing.get("email_norm"):
                 fields.append("email")
-
-            if telephone_norm and existing.get("telephone_norm") == telephone_norm:
+            if telephone_norm and telephone_norm == existing.get("telephone_norm"):
                 fields.append("telephone")
 
-            # Infos retournées à Streamlit
-            duplicate_info = {
-                "message": "Doublon détecté",
-                "fields": fields,
-                "existing_prospect_id": existing.get("prospect_id"),
-            }
-
-            # Si force=false → on bloque la création
-            if not force:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=duplicate_info,
-                )
-
-    # ----------------------------------------------------------------
-    # Préparation du document MongoDB à insérer
-    # ----------------------------------------------------------------
-    # On convertit le modèle Pydantic en dict Python
-    doc = payload.model_dump()
-
-    # Génère un identifiant unique côté backend
-    doc["prospect_id"] = str(uuid4())
-
-    # Champs normalisés (utiles pour index et détection de doublons)
-    doc["email_norm"] = email_norm
-    doc["telephone_norm"] = telephone_norm
-
-    # Flag pour autoriser les doublons si force=true
-    doc["allow_duplicate"] = bool(force)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "Doublon détecté",
+                    "fields": fields,
+                    "existing_prospect_id": existing.get("prospect_id"),
+                },
+            )
 
     # ----------------------------------------------------------------
     # Insertion en base MongoDB
     # ----------------------------------------------------------------
     try:
         await col.insert_one(doc)
-
+        created = await col.find_one({"prospect_id": doc["prospect_id"]})
     except DuplicateKeyError:
-        # Cas rare : 2 requêtes simultanées passent la vérification
-        # mais Mongo bloque la 2e grâce à l'index unique
-
-        existing = None
-        if or_filters:
-            existing = await col.find_one(
-                {"$or": or_filters},
-                {"prospect_id": 1}
-            )
-
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "message": "Doublon détecté (conflit d'insertion)",
-                "existing_prospect_id": (existing or {}).get("prospect_id"),
-            },
+            detail={"message": "Doublon détecté (conflit d'index)"},
         )
 
     # ----------------------------------------------------------------
     # Réponse HTTP 201 : prospect créé
     # ----------------------------------------------------------------
-    return doc
-
-# -------------------------------------------------------------------
-# Endpoint GET /prospects/{prospect_id}
-# -------------------------------------------------------------------
-@router.get("/{prospect_id}", response_model=ProspectOut, status_code=status.HTTP_200_OK)
-async def get_prospect(prospect_id: str):
-    """
-    Récupère un prospect via son prospect_id (UUID).
-    - Si introuvable : 404
-    - Sinon : retourne toutes les infos (sans _id)
-    """
-    # Récupère la collection MongoDB "prospects"
-    col = get_prospects_collection()
-
-    # Recherche d'un document Mongo dont le champ "prospect_id"
-    doc = await col.find_one({"prospect_id": prospect_id})
-    # Si aucun document n'est trouvé
-    if not doc:
-        # On renvoie une erreur HTTP 404 (Not Found)
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Prospect introuvable",
-        )
-
-    # Si le prospect existe :
-    # - on nettoie le document Mongo (suppression de _id, champs techniques)
-    # - FastAPI valide automatiquement la réponse avec ProspectOut
-    return serialize_prospect(doc)
+    return serialize_prospect(created)
 
 # -------------------------------------------------------------------
 # Endpoint GET /prospects/
@@ -290,6 +225,9 @@ async def update_prospect(
     # ---------------------------------------------------------------
     # Normalisation email / téléphone (si fournis)
     # ---------------------------------------------------------------
+    # IMPORTANT :
+    # - si le client envoie email=None ou telephone=None, on doit UNSET les champs normalisés
+    # - si le client n'envoie pas le champ, on ne touche à rien
     email_norm: Optional[str] = None
     telephone_norm: Optional[str] = None
 
@@ -297,16 +235,19 @@ async def update_prospect(
     telephone_provided = "telephone" in updates
 
     if email_provided:
-        email_norm = normalize_email_for_db(updates.get("email"))
+        email_val = updates.get("email")
+        email_norm = normalize_email_for_db(email_val) if email_val else None
 
     if telephone_provided:
-        telephone_norm = normalize_phone_for_db(updates.get("telephone"))
+        tel_val = updates.get("telephone")
+        telephone_norm = normalize_phone_for_db(tel_val) if tel_val else None
 
     # ---------------------------------------------------------------
     # Vérification des doublons (email / téléphone)
     # ---------------------------------------------------------------
     or_filters: List[Dict[str, Any]] = []
 
+    # On ne check que si la nouvelle valeur normalisée existe (non vide)
     if email_provided and email_norm:
         or_filters.append(
             {
@@ -357,21 +298,33 @@ async def update_prospect(
     set_doc: Dict[str, Any] = {}
     unset_doc: Dict[str, Any] = {}
 
+    # On copie les updates (champs envoyés par le client) dans $set
     set_doc.update(updates)
 
-    # email_norm
+    # email_norm :
+    # - si email est fourni dans PATCH :
+    #   - si email_norm existe -> on set email_norm
+    #   - sinon -> on unset email_norm (champ supprimé, donc ne participe plus aux index)
     if email_provided:
         if email_norm:
             set_doc["email_norm"] = email_norm
+            set_doc["email_unique_key"] = (
+                email_norm if not force else f"FORCED:{uuid4()}"
+            )
         else:
             unset_doc["email_norm"] = ""
+            unset_doc["email_unique_key"] = ""
 
-    # telephone_norm
+    # telephone_norm :
     if telephone_provided:
         if telephone_norm:
             set_doc["telephone_norm"] = telephone_norm
+            set_doc["telephone_unique_key"] = (
+                telephone_norm if not force else f"FORCED:{uuid4()}"
+            )
         else:
             unset_doc["telephone_norm"] = ""
+            unset_doc["telephone_unique_key"] = ""
 
     mongo_update: Dict[str, Any] = {"$set": set_doc}
     if unset_doc:
@@ -392,7 +345,7 @@ async def update_prospect(
     updated = await col.find_one({"prospect_id": prospect_id})
 
     # ---------------------------------------------------------------
-    # LOGS — journalisation des modifications (Ticket 3.6)
+    # LOGS — journalisation des modifications
     # ---------------------------------------------------------------
     if updates:
         fields_to_log = list(updates.keys())
@@ -401,6 +354,9 @@ async def update_prospect(
         if "prospect_id" in fields_to_log:
             fields_to_log.remove("prospect_id")
 
+        # NOTE :
+        # Si tu veux logger aussi email_norm/telephone_norm lorsque email/tel change,
+        # tu peux les ajouter ici, mais en général on log les champs "métier" (email/telephone).
         diffs = compute_diff(existing, updated, fields_to_log)
 
         if diffs:
@@ -583,6 +539,9 @@ async def list_logs(
     # Retourne la liste des logs
     return logs
 
+# -------------------------------------------------------------------
+# GET /search
+# -------------------------------------------------------------------
 @router.get("/search", response_model=List[ProspectOut], status_code=status.HTTP_200_OK)
 async def search_prospects(
     # Recherche texte

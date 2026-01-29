@@ -1,9 +1,14 @@
-import re
 import streamlit as st
 
 from services.prospects_api import create_prospect
 from utils.validators import is_valid_email, is_valid_phone
-from utils.constants import TYPE_PROSPECT_OPTIONS
+from utils.constants import (
+    TYPE_PROSPECT_OPTIONS,
+    REGION_FRANCE_OPTIONS,
+    DEPARTEMENT_OPTIONS,
+    PAYS_OPTIONS,
+    METHODE_CONTACT_OPTIONS,
+)
 
 # ------------------------------------------------------------
 # Configuration page
@@ -79,9 +84,26 @@ with st.form("add_prospect_form", clear_on_submit=False):
 
     st.subheader("Localisation")
 
-    pays = st.text_input("Pays", key="form_pays")
-    region = st.text_input("Région", key="form_region")
-    departement = st.text_input("Département", key="form_departement")
+    pays = st.selectbox(
+        "Pays",
+        PAYS_OPTIONS,
+        index=PAYS_OPTIONS.index("France"),
+        key="form_pays",
+    )
+    region = st.selectbox(
+        "Région",
+        REGION_FRANCE_OPTIONS,
+        index=None,
+        placeholder="Choisir une région",
+        key="form_region",
+    )
+    departement = st.selectbox(
+        "Département",
+        DEPARTEMENT_OPTIONS,
+        index=None,
+        placeholder="Choisir un département",
+        key="form_departement",
+    )
     adresse = st.text_input("Adresse", key="form_adresse")
 
     st.subheader("Statut")
@@ -91,8 +113,11 @@ with st.form("add_prospect_form", clear_on_submit=False):
         key="form_accepte_contact",
     )
 
-    methode_contact = st.text_input(
+    methode_contact = st.selectbox(
         "Méthode de contact",
+        METHODE_CONTACT_OPTIONS,
+        index=None,
+        placeholder="Choisir une méthode",
         key="form_methode_contact",
     )
 
