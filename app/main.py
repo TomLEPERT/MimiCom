@@ -2,6 +2,7 @@ import os
 import requests
 import streamlit as st
 
+
 # Récupère l'URL de l'API depuis les variables d'environnement
 # Si elle n'existe pas, on utilise "http://localhost:8000" par défaut
 # (utile quand on lance l'app sans Docker)
@@ -21,3 +22,12 @@ if st.button("Ping API"):
         # Si l'API est inaccessible ou renvoie une erreur :
         # on affiche le message d'erreur en rouge dans l'interface
         st.error(str(e))
+        
+# ajout louisa router/login
+from fastapi import FastAPI
+from routers import login 
+app.include_router(login.router)
+
+@app.get("/")
+def read_root():
+    return {"message": "L'API est en ligne"}
