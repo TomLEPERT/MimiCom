@@ -6,6 +6,8 @@ from components.prospect_card import render_prospect_card
 from components.prospect_inline_edit import render_prospect_inline_edit
 from components.prospects_filters import render_prospects_filters
 
+if not st.session_state.get("authenticated"):
+    st.switch_page("main.py")
 
 # ------------------------------------------------------------
 # Config page
