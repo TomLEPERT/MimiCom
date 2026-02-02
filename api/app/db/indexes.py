@@ -2,6 +2,7 @@ from typing import Any, Dict, List
 
 from .prospects import get_prospects_collection
 from .logs import get_logs_collection
+from .import_previews import get_import_previews_collection
 
 async def _drop_index_if_exists(col, name: str) -> None:
     """
@@ -105,3 +106,9 @@ async def ensure_logs_indexes():
 
     # Pour filtrer par utilisateur
     await col.create_index([("user", 1), ("changed_at", -1)], name="logs_by_user")
+    
+
+async def ensure_import_previews_indexes():
+    col = get_import_previews_collection()
+    # TTL : supprime les previews après 3600s (1h)
+    await col.create_index("created_at", expireAfterSeconds=3600, name="ttl_import_previews")
