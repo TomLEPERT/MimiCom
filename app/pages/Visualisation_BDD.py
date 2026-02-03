@@ -5,6 +5,7 @@ from components.prospects_table import render_prospects_table
 from components.prospect_card import render_prospect_card
 from components.prospect_inline_edit import render_prospect_inline_edit
 from components.prospects_filters import render_prospects_filters
+from components.sidebar import show_sidebar
 
 if not st.session_state.get("authenticated"):
     st.switch_page("main.py")
@@ -17,8 +18,6 @@ st.title("Base de données prospects")
 
 # Bouton
 st.page_link("pages/Ajouter_Prospect.py", label="Ajouter un prospect")
-
-
 # ------------------------------------------------------------
 # Session state : modes + sélection
 # ------------------------------------------------------------
@@ -217,3 +216,7 @@ if st.session_state.bdd_edit_id:
     if edit_action == "cancel":
         stop_edit()
         st.rerun()
+
+
+# On appelle la sidebar (gère la sécurité et le bouton)
+show_sidebar()
