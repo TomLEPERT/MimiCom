@@ -1,27 +1,31 @@
 from typing import Any, Dict, Optional, Tuple
 
-from .request import request, request_files
+from services.request import request, request_files
 
 
-# -------------------------------------------------------------------
-# Imports : Prospects CSV
-# -------------------------------------------------------------------
-def preview_import_prospects(uploaded_file) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
-    """
-    POST /imports/prospects/preview (multipart/form-data)
-    """
-    files = {
-        "file": (uploaded_file.name, uploaded_file.getvalue(), "text/csv"),
-    }
-    return request_files("POST", "/imports/prospects/preview", files=files)
+def preview_import_csv(*, filename: str, file_bytes: bytes) -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
+    return request_files(
+        "POST",
+        "/imports/preview",
+        files={"file": (filename, file_bytes, "text/csv")},
+    )
 
 
-def commit_import_prospects(
-    preview_id: str,
-    force: bool = False,
-) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
-    """
-    POST /imports/prospects/commit
-    """
-    payload = {"preview_id": preview_id, "force": force}
-    return request("POST", "/imports/prospects/commit", json=payload)
+def start_commit_async(
+    *,
+    import_id: str,
+    merge_strategy: str,
+    overrides: Optional[Dict[str, str]] = None,
+) -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
+    payload: Dict[str, Any] = {"import_id": import_id, "merge_strategy": merge_strategy}
+    if overrides:
+        payload["overrides"] = overrides  # {"12":"force_add", ...}
+    return request("POST", "/imports/commit-async", json=payload)
+
+
+def get_import_progress(*, import_id: str) -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
+    return request("GET", "/imports/progress", params={"import_id": import_id})
+
+
+def get_import_result(*, import_id: str) -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
+    return request("GET", "/imports/result", params={"import_id": import_id})

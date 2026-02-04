@@ -1,6 +1,5 @@
 import random
-import uuid
-from typing import Optional, Dict, Union, cast
+from typing import Optional, Dict, Union, List
 import pandas as pd
 from faker import Faker
 
@@ -9,9 +8,16 @@ fake = Faker("fr_FR")
 # ===============================
 # CONFIGURATION
 # ===============================
-NB_ROWS = 5000
+NB_ROWS = 50_000
 
-TYPES = [
+# % de lignes qui réutilisent un email existant (doublon CSV)
+DUP_EMAIL_RATE = 0.07   # 7%
+# % de lignes qui réutilisent un tel existant (doublon CSV)
+DUP_TEL_RATE = 0.06     # 6%
+
+OUT_PATH = "data/fake_prospects_dataset_50k.csv"
+
+TYPES_ENUM = [
     "Asso jdr",
     "CSCS",
     "MJC",
@@ -124,159 +130,114 @@ DEPARTEMENTS = {
     "76": ("Normandie", ["Rouen", "Le Havre", "Dieppe"])
 }
 
-# ===============================
-# FONCTIONS UTILITAIRES
-# ===============================
-
-def maybe(value: str, proba: float = 0.7) -> Optional[str]:
-    return value if random.random() < proba else None
-
-def maybe_int(value: int, proba: float = 0.7) -> Optional[int]:
+# -------------------------------
+# Utils
+# -------------------------------
+def maybe(value, proba: float = 0.7):
     return value if random.random() < proba else None
 
 def random_followers(mini: int, maxi: int) -> int:
     return random.randint(mini, maxi)
 
-def generate_socials(prospect_type: str) -> Dict[str, Optional[Union[str, int]]]:
-    data: Dict[str, Optional[Union[str, int]]] = {
-        "FB": None, "FB_nb_aderent": None,
-        "Twitter": None, "Twitter_nb_aderent": None,
-        "Insta": None, "Insta_nb_aderent": None,
-        "Youtube": None, "Youtube_nb_aderent": None,
-        "Tiktok": None, "Tiktok_nb_aderent": None,
-    }
+def fake_fr_mobile() -> str:
+    return "0" + random.choice(["6", "7"]) + "".join(str(random.randint(0, 9)) for _ in range(8))
 
-    # Structures (asso, médiathèque, MJC…)
-    if prospect_type in ["Asso jdr", "MJC", "CSCS", "Ludothèque", "Médiathèque"]:
-        if random.random() < 0.85:
-            data["FB"] = fake.url()
-            data["FB_nb_aderent"] = random_followers(100, 4000)
+def social_block(url_proba: float, min_followers: int, max_followers: int):
+    url = maybe(fake.url(), url_proba)
+    followers = random_followers(min_followers, max_followers) if url else None
+    return url, followers
 
-        if random.random() < 0.35:
-            data["Twitter"] = fake.url()
-            data["Twitter_nb_aderent"] = random_followers(50, 2000)
-
-        if random.random() < 0.25:
-            data["Insta"] = fake.url()
-            data["Insta_nb_aderent"] = random_followers(100, 3000)
-
-    # Commerces / bars / artisans
-    if prospect_type in ["Bar à jeux", "Boutique spécialisée", "Artisan"]:
-        if random.random() < 0.75:
-            data["Insta"] = fake.url()
-            data["Insta_nb_aderent"] = random_followers(300, 6000)
-
-        if random.random() < 0.95:
-            data["FB"] = fake.url()
-            data["FB_nb_aderent"] = random_followers(200, 5000)
-
-        if random.random() < 0.8:
-            data["Twitter"] = fake.url()
-            data["Twitter_nb_aderent"] = random_followers(100, 3000)
-
-    # Éditeurs
-    if prospect_type == "Editeur":
-        if random.random() < 1:
-            data["FB"] = fake.url()
-            data["FB_nb_aderent"] = random_followers(500, 10000)
-
-        if random.random() < 1:
-            data["Twitter"] = fake.url()
-            data["Twitter_nb_aderent"] = random_followers(500, 15000)
-
-        if random.random() < 1:
-            data["Insta"] = fake.url()
-            data["Insta_nb_aderent"] = random_followers(800, 12000)
-
-        if random.random() < 0.8:
-            data["Youtube"] = fake.url()
-            data["Youtube_nb_aderent"] = random_followers(300, 8000)
-
-    # Influenceurs
-    if prospect_type == "Influenceur":
-        data["Insta"] = fake.url()
-        data["Insta_nb_aderent"] = random_followers(2000, 30000)
-
-        if random.random() < 1:
-            data["Twitter"] = fake.url()
-            data["Twitter_nb_aderent"] = random_followers(1000, 25000)
-
-        if random.random() < 0.8:
-            data["Youtube"] = fake.url()
-            data["Youtube_nb_aderent"] = random_followers(2000, 50000)
-
-        if random.random() < 0.85:
-            data["Tiktok"] = fake.url()
-            data["Tiktok_nb_aderent"] = random_followers(3000, 80000)
-
-    return data
-
-def generate_nb_adherent(prospect_type: str) -> Optional[int]:
-    if prospect_type in ["Asso jdr", "MJC", "CSCS", "Ludothèque", "Médiathèque"]:
-        return random.randint(20, 500)
-    return None
+def pick_or_new(pool: List[str], make_new_fn, dup_rate: float) -> Optional[str]:
+    """
+    Avec probabilité dup_rate, renvoie une valeur existante (doublon).
+    Sinon, génère une nouvelle valeur.
+    Si pool est vide, génère toujours une nouvelle valeur.
+    """
+    if pool and random.random() < dup_rate:
+        return random.choice(pool)
+    v = make_new_fn()
+    pool.append(v)
+    return v
 
 # ===============================
-# GÉNÉRATION DU DATASET
+# Génération
 # ===============================
+rows: List[Dict[str, Optional[Union[str, int, bool]]]] = []
 
-rows = []
+# Pools pour créer des doublons CSV
+email_pool: List[str] = []
+tel_pool: List[str] = []
 
 for _ in range(NB_ROWS):
-    dep = random.choice(list(DEPARTEMENTS.keys()))
-    region, villes = DEPARTEMENTS[dep]
-    ville = random.choice(villes)
-    prospect_type = random.choice(TYPES)
-    socials = generate_socials(prospect_type)
+    type_prospect = random.choice(TYPES_ENUM)
 
-    # Champs typés
-    email: Optional[str] = maybe(fake.email(), 0.95)
-    tel: Optional[str] = maybe(fake.phone_number(), 0.9)
-    web_site: Optional[str] = maybe(fake.url(), 0.9)
-    commentaire: Optional[str] = maybe(fake.sentence(), 0.3)
-    date_contact: Optional[str] = maybe(str(fake.date_between(start_date="-2y", end_date="today")), 0.5)
-    fb_nb: Optional[int] = cast(Optional[int], socials["FB_nb_aderent"])
-    twitter_nb: Optional[int] = cast(Optional[int], socials["Twitter_nb_aderent"])
-    insta_nb: Optional[int] = cast(Optional[int], socials["Insta_nb_aderent"])
-    youtube_nb: Optional[int] = cast(Optional[int], socials["Youtube_nb_aderent"])
-    tiktok_nb: Optional[int] = cast(Optional[int], socials["Tiktok_nb_aderent"])
-    nb_adherent: Optional[int] = generate_nb_adherent(prospect_type)
+    # Contacts avec doublons contrôlés
+    email = maybe(
+        pick_or_new(email_pool, lambda: fake.email(), DUP_EMAIL_RATE),
+        0.95
+    )
+    telephone = maybe(
+        pick_or_new(tel_pool, fake_fr_mobile, DUP_TEL_RATE),
+        0.90
+    )
 
-    row: Dict[str, Optional[Union[str, int]]] = {
-        "ID": str(uuid.uuid4())[:8],
-        "Nom": f"{prospect_type} {fake.word().capitalize()}",
-        "Email": email,
-        "Tel": tel,
-        "Type": prospect_type,
-        "Web_site": web_site,
-        "FB": socials["FB"],
-        "FB_nb_aderent": fb_nb,
-        "Twitter": socials["Twitter"],
-        "Twitter_nb_aderent": twitter_nb,
-        "Insta": socials["Insta"],
-        "Insta_nb_aderent": insta_nb,
-        "Youtube": socials["Youtube"],
-        "Youtube_nb_aderent": youtube_nb,
-        "Tiktok": socials["Tiktok"],
-        "Tiktok_nb_aderent": tiktok_nb,
-        "nb_adherent": nb_adherent,
-        "Date_contact": date_contact,
-        "Adresse_postal": f"{fake.street_address()} {ville}",
-        "Departement": dep,
-        "Region": region,
-        "Pays": "France",
-        "Accepte_com": random.choice(["Oui", "Non"]),
-        "Statut": random.choice(["Prospect", "Contacté", "Intéressé"]),
-        "Commentaire": commentaire,
+    # garantie au moins email OU tel
+    if not email and not telephone:
+        # prend un email (doublon possible si pool non vide, sinon nouveau)
+        email = pick_or_new(email_pool, lambda: fake.email(), DUP_EMAIL_RATE)
+
+    facebook, facebook_followers = social_block(0.7, 100, 10000)
+    x, x_followers = social_block(0.5, 50, 15000)
+    instagram, instagram_followers = social_block(0.7, 100, 30000)
+    youtube, youtube_followers = social_block(0.4, 100, 50000)
+    tictok, tictok_followers = social_block(0.4, 100, 80000)
+
+    row: Dict[str, Optional[Union[str, int, bool]]] = {
+        "nom_structure": f"{type_prospect} {fake.word().capitalize()}",
+        "nom_contact": maybe(fake.name(), 0.6),
+
+        "email": email,
+        "telephone": telephone,
+        "type_prospect": type_prospect,
+
+        "pays": "France",
+        "region": "Nouvelle-Aquitaine",
+        "departement": "33",
+        "ville": "Bordeaux",
+        "adresse": maybe(fake.street_address(), 0.8),
+
+        "nb_aderents": maybe(random.randint(20, 500), 0.4),
+
+        "facebook": facebook,
+        "facebook_followers": facebook_followers,
+
+        "x": x,
+        "x_followers": x_followers,
+
+        "instagram": instagram,
+        "instagram_followers": instagram_followers,
+
+        "youtube": youtube,
+        "youtube_followers": youtube_followers,
+
+        "tictok": tictok,
+        "tictok_followers": tictok_followers,
+
+        "sit_web": maybe(fake.url(), 0.8),
+
+        "accepte_contact": random.choice([True, False]),
+        "methode_contact": maybe(random.choice(["email", "telephone", "instagram", "facebook"]), 0.6),
+
+        "contacte": random.choice([True, False]),
+        "date_dernier_contact": maybe(str(fake.date_between(start_date="-2y", end_date="today")), 0.5),
+
+        "commentaires": maybe(fake.sentence(), 0.3),
     }
 
     rows.append(row)
 
 df = pd.DataFrame(rows)
-
-# ===============================
-# EXPORT CSV
-# ===============================
-df.to_csv("fake_festival_jdr_dataset.csv", index=False, encoding="utf-8")
+df.to_csv(OUT_PATH, index=False, encoding="utf-8")
 
 print("Dataset généré :", len(df), "lignes")
+print(f"Export : {OUT_PATH}")
