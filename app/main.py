@@ -4,6 +4,7 @@ from components.login import render_login
 st.set_page_config(page_title="Mimicom", layout="centered")
 
 # Session state init
+st.session_state.setdefault("time_out", None)
 st.session_state.setdefault("authenticated", False)
 st.session_state.setdefault("username", "")
 

@@ -24,6 +24,9 @@ st.set_page_config(
 
 st.title("Ajouter un prospect")
 
+# on appelle la sidebar
+show_sidebar()
+
 # ------------------------------------------------------------
 # Session state (gestion doublon + reset)
 # ------------------------------------------------------------
@@ -217,5 +220,3 @@ if st.session_state.pending_conflict:
                 st.rerun()
                 
 
-# on appelle la sidebar
-show_sidebar()

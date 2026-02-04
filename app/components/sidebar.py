@@ -1,6 +1,8 @@
 import streamlit as st
+from components.login import time_out
 
 def show_sidebar():
+    time_out()
     # Vérification de l'authentification
     if not st.session_state.get("authenticated", False):
             if st.button("Aller à la page de connexion"):
