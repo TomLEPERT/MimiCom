@@ -121,6 +121,38 @@ def search_prospects(
 
     return request("GET", "/prospects/search", params=params)
 
+def import_prospects_csv_preview(
+    file_bytes: bytes,
+    filename: str = "import.csv",
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """
+    Preview import CSV (dry_run=true)
+    POST /prospects/import?dry_run=true
+    """
+    files = {"file": (filename, file_bytes, "text/csv")}
+    return request("POST", "/prospects/import", params={"dry_run": True}, files=files)
+
+
+def import_prospects_csv_apply(
+    file_bytes: bytes,
+    *,
+    filename: str = "import.csv",
+    force_mode: str = "none",
+    force_rows: Optional[List[int]] = None,
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """
+    Import réel (dry_run=false)
+    POST /prospects/import?dry_run=false&force_mode=...&force_rows=...
+    """
+    params: Dict[str, Any] = {"dry_run": False, "force_mode": force_mode}
+
+    # force_rows = liste -> query params répétées
+    # requests accepte list => force_rows=1&force_rows=2...
+    if force_rows:
+        params["force_rows"] = force_rows
+
+    files = {"file": (filename, file_bytes, "text/csv")}
+    return request("POST", "/prospects/import", params=params, files=files)
 
 """
 Cas d'utilisation : 

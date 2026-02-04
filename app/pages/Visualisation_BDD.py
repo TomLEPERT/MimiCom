@@ -17,7 +17,7 @@ st.title("Base de données prospects")
 
 # Bouton
 st.page_link("pages/Ajouter_Prospect.py", label="Ajouter un prospect")
-
+st.page_link("pages/Imports.py", label="Import CSV")
 
 # ------------------------------------------------------------
 # Session state : modes + sélection
