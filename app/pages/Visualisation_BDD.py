@@ -25,12 +25,6 @@ show_sidebar()
 if "bdd_mode" not in st.session_state:
     st.session_state.bdd_mode = "list"
 
-# --- BOUTON SIDEBAR ---
-#st.sidebar.divider()
-#if st.sidebar.button("⚙️ Settings", key="sidebar_settings_btn"):
-    #st.session_state.bdd_mode = "settings" 
-    #st.rerun()
-
 # --- AFFICHAGE ---
 
 if st.session_state.get("bdd_mode") == "settings":
