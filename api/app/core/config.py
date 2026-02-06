@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 
 # URL de connexion à la base de données MongoDB
 # On essaie d'abord de la lire depuis la variable d'environnement MONGODB_URI
@@ -21,3 +22,9 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 # Sert à stocker le résultat des tâches Celery (ex: statut terminé, valeur de retour)
 # 1 = numéro de base Redis utilisée pour stocker les résultats
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+ENV_PATH = os.path.join(BASE_DIR, ".env")
+
+def reload_env() -> None:
+    load_dotenv(ENV_PATH, override=True)

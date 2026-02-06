@@ -10,6 +10,9 @@ from utils.constants import (
     METHODE_CONTACT_OPTIONS,
 )
 
+if not st.session_state.get("authenticated"):
+    st.switch_page("main.py")
+
 # ------------------------------------------------------------
 # Configuration page
 # ------------------------------------------------------------
