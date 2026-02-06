@@ -18,7 +18,7 @@ def render_invalid_rows(invalid: List[Dict[str, Any]]) -> None:
             }
             for r in invalid
         ],
-        use_container_width=True,
+        width="stretch",
     )
 
     # Export CSV erreurs
@@ -83,7 +83,7 @@ def render_duplicates(duplicates: List[Dict[str, Any]]) -> None:
                         "Téléphone": d.get("telephone_normalized"),
                         "Détail": d.get("existing_snapshot", {}),
                     })
-                st.dataframe(rows, use_container_width=True)
+                st.dataframe(rows, width="stretch")
 
     # -----------------------------
     # Doublons DB (error/info)
@@ -110,7 +110,7 @@ def render_duplicates(duplicates: List[Dict[str, Any]]) -> None:
                         "Téléphone": d.get("telephone_normalized"),
                         "Prospect existant": d.get("existing_prospect_id"),
                     })
-                st.dataframe(rows, use_container_width=True)
+                st.dataframe(rows, width="stretch")
 
                 # Snapshot existant
                 snap = items[0].get("existing_snapshot")
