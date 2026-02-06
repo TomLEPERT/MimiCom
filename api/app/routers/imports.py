@@ -5,6 +5,7 @@ from uuid import uuid4
 import asyncio
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from pydantic import ValidationError
 from pymongo import UpdateOne
 from pymongo.errors import BulkWriteError
@@ -264,7 +265,12 @@ async def import_preview(file: UploadFile = File(...)):
         "valid_rows": valid_rows_for_commit,
         "duplicates": [d.model_dump() for d in duplicates],
     }
-    await redis_client.setex(f"import_preview:{import_id}", PREVIEW_TTL_SECONDS, json.dumps(preview_payload))
+    
+    await redis_client.setex(
+        f"import_preview:{import_id}",
+        PREVIEW_TTL_SECONDS,
+        json.dumps(jsonable_encoder(preview_payload)),
+    )
 
     return ImportPreviewResponse(
         status=status_out,
