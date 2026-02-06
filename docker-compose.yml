@@ -22,6 +22,8 @@ services:
     env_file: .env
     # env_file = charge les variables d'environnement depuis le fichier .env
     # (ex: API_URL, etc.)
+    environment:
+      - API_URL=http://api:8000
     depends_on:
       # depends_on = Docker démarre d'abord le service "api"
       # Attention : ça ne garantit pas que l'API est "prête", juste qu'elle est lancée
@@ -37,6 +39,10 @@ services:
       # API accessible sur http://localhost:8000
       - "8000:8000"
     env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - MONGODB_URI=mongodb://mongodb:27017/mimicom
+      - MONGODB_DB=mimicom
     depends_on:
       # L'API a besoin de MongoDB (données) et Redis (queue Celery)
       - mongodb
@@ -54,6 +60,12 @@ services:
     # worker = mode "travailleur"
     command: celery -A app.tasks.celery_app.celery worker --loglevel=INFO
     env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - MONGODB_URI=mongodb://mongodb:27017/mimicom
+      - MONGODB_DB=mimicom
     depends_on:
       # Celery a besoin de Redis (broker) et MongoDB (pour lire/écrire les résultats)
       - redis

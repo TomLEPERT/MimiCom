@@ -50,11 +50,9 @@ async def ensure_prospects_indexes():
     # ------------------------------------------------------------
     idx = existing_by_name.get(desired_email["name"])
     if idx:
-        # Si l'index existe mais n'a PAS la partialFilterExpression attendue -> on drop
-        if idx.get("partialFilterExpression") != desired_email["partialFilterExpression"] or idx.get("unique") != True:
+        if idx.get("partialFilterExpression") != desired_email["partialFilterExpression"] or idx.get("unique") is not True:
             await _drop_index_if_exists(prospects_col, desired_email["name"])
 
-    # On (re)crée l'index
     await prospects_col.create_index(
         [("email_unique_key", 1)],
         name="uniq_email_key",
@@ -67,7 +65,7 @@ async def ensure_prospects_indexes():
     # ------------------------------------------------------------
     idx = existing_by_name.get(desired_tel["name"])
     if idx:
-        if idx.get("partialFilterExpression") != desired_tel["partialFilterExpression"] or idx.get("unique") != True:
+        if idx.get("partialFilterExpression") != desired_tel["partialFilterExpression"] or idx.get("unique") is not True:
             await _drop_index_if_exists(prospects_col, desired_tel["name"])
 
     await prospects_col.create_index(
@@ -75,23 +73,6 @@ async def ensure_prospects_indexes():
         name="uniq_telephone_key",
         unique=True,
         partialFilterExpression=desired_tel["partialFilterExpression"],
-    )
-
-    # ------------------------------------------------------------
-    # Index unique partiel sur telephone_unique_key
-    # Même logique: string non vide
-    # ------------------------------------------------------------
-    await prospects_col.create_index(
-        [("telephone_unique_key", 1)],
-        name="uniq_telephone_key",
-        unique=True,
-        partialFilterExpression={
-            "telephone_unique_key": {
-                "$exists": True,
-                "$type": "string",
-                "$gt": "",
-            }
-        },
     )
 
 async def ensure_logs_indexes():

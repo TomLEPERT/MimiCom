@@ -44,6 +44,8 @@ if st.session_state.get("bdd_mode") == "settings":
     
 # Bouton
 st.page_link("pages/Ajouter_Prospect.py", label="Ajouter un prospect")
+st.page_link("pages/Imports.py", label="Import CSV")
+
 # ------------------------------------------------------------
 # Session state : modes + sélection
 # ------------------------------------------------------------
