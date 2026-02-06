@@ -345,6 +345,24 @@ async def _run_commit(
             except (TypeError, ValueError):
                 pass
 
+    # ------------------------------------------------------------
+    # NOUVEAU : doublons CSV -> sets de valeurs dupliquées
+    # ------------------------------------------------------------
+    csv_dup_emails: Set[str] = set()
+    csv_dup_phones: Set[str] = set()
+
+    for d in duplicates:
+        if d.get("source") != "csv":
+            continue
+        if d.get("email_normalized"):
+            csv_dup_emails.add(d["email_normalized"])
+        if d.get("telephone_normalized"):
+            csv_dup_phones.add(d["telephone_normalized"])
+
+    # Pour IGNORE/REPLACE (sans hit DB), on garde la 1ère occurrence et ignore les suivantes
+    seen_csv_email: Set[str] = set()
+    seen_csv_phone: Set[str] = set()
+
     total = len(valid_rows)
 
     await set_progress(
@@ -445,18 +463,39 @@ async def _run_commit(
         elif tel_norm and tel_norm in existing_by_phone:
             hit = existing_by_phone[tel_norm]
 
-        # IGNORE
+        # ------------------------------------------------------------
+        # IGNORE_DUPLICATES
+        # ------------------------------------------------------------
         if effective_strategy == MergeStrategy.IGNORE_DUPLICATES:
             if hit:
                 ignored += 1
             else:
+                # NOUVEAU : dédup CSV (garder 1ère occurrence)
+                if email_norm and email_norm in csv_dup_emails:
+                    if email_norm in seen_csv_email:
+                        ignored += 1
+                        processed += 1
+                        continue
+                    seen_csv_email.add(email_norm)
+
+                if tel_norm and tel_norm in csv_dup_phones:
+                    if tel_norm in seen_csv_phone:
+                        ignored += 1
+                        processed += 1
+                        continue
+                    seen_csv_phone.add(tel_norm)
+
                 inserts.append(_build_insert_doc(src, force=False))
 
+        # ------------------------------------------------------------
         # FORCE_ADD
+        # ------------------------------------------------------------
         elif effective_strategy == MergeStrategy.FORCE_ADD:
             inserts.append(_build_insert_doc(src, force=True))
 
+        # ------------------------------------------------------------
         # REPLACE_EXISTING
+        # ------------------------------------------------------------
         elif effective_strategy == MergeStrategy.REPLACE_EXISTING:
             if hit:
                 target_id = hit["prospect_id"]
@@ -488,6 +527,21 @@ async def _run_commit(
 
                 update_ops.append(UpdateOne({"prospect_id": target_id}, {"$set": update_doc}))
             else:
+                # Pas de hit DB -> insert, mais NOUVEAU : dédup CSV comme IGNORE
+                if email_norm and email_norm in csv_dup_emails:
+                    if email_norm in seen_csv_email:
+                        ignored += 1
+                        processed += 1
+                        continue
+                    seen_csv_email.add(email_norm)
+
+                if tel_norm and tel_norm in csv_dup_phones:
+                    if tel_norm in seen_csv_phone:
+                        ignored += 1
+                        processed += 1
+                        continue
+                    seen_csv_phone.add(tel_norm)
+
                 inserts.append(_build_insert_doc(src, force=False))
 
         else:
