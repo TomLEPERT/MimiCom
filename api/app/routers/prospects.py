@@ -1,9 +1,9 @@
+import re
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 from datetime import datetime, timezone
-import re
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Query, status, HTTPException
 from pymongo.errors import DuplicateKeyError
 from ..db.prospects import get_prospects_collection
 from ..models.prospect import ProspectCreate, ProspectOut, ProspectUpdate
