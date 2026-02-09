@@ -27,6 +27,7 @@ from ..utils.normalizers import normalize_email_for_db, normalize_phone_for_db
 from ..utils.csv_reader import read_csv_bytes
 from ..core.redis_lock import acquire_import_lock, release_import_lock
 from ..core.import_progress import set_progress, get_progress, set_result, get_result
+from ..tasks.geocoding_tasks import geocode_backfill_task
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 
@@ -600,6 +601,10 @@ async def _run_commit(
         import_id,
         {"status": "done", "phase": "done", "processed": total, "total": total, "percent": 100},
     )
+
+    # Lance un backfill géocoding en arrière-plan (non bloquant)
+    # Il ne mettra à jour que les lignes avec lat/lon manquants.
+    geocode_backfill_task.delay(limit=2000)
 
     return result
 

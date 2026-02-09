@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query, status, HTTPException
 from pymongo.errors import DuplicateKeyError
 from ..db.prospects import get_prospects_collection
 from ..models.prospect import ProspectCreate, ProspectOut, ProspectUpdate
+from ..tasks.geocoding_tasks import geocode_prospect_task
 from ..utils.normalizers import normalize_email_for_db, normalize_phone_for_db
 from ..utils.mongo_serializers import serialize_prospect
 from ..db.logs import get_logs_collection
@@ -134,6 +135,13 @@ async def create_prospect(payload: ProspectCreate, force: bool = Query(default=F
     # ----------------------------------------------------------------
     # Réponse HTTP 201 : prospect créé
     # ----------------------------------------------------------------
+    # ----------------------------------------------------------------
+    # Géocodage asynchrone (si lat/lon manquants)
+    # ----------------------------------------------------------------
+    if doc.get("lat") is None or doc.get("lon") is None:
+        # on lance une tâche Celery (ne bloque pas la requête HTTP)
+        geocode_prospect_task.delay(doc["prospect_id"])
+
     return serialize_prospect(created)
 
 # -------------------------------------------------------------------
@@ -378,6 +386,12 @@ async def update_prospect(
                 )
 
             await logs_col.insert_many(log_docs)
+
+    # ---------------------------------------------------------------
+    # Géocodage asynchrone (update)
+    # ---------------------------------------------------------------
+    if updated.get("lat") is None or updated.get("lon") is None:
+        geocode_prospect_task.delay(updated["prospect_id"])
 
     # ---------------------------------------------------------------
     # Retour API

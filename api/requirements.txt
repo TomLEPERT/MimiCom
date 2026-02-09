@@ -7,3 +7,4 @@ motor
 celery
 redis
 python-multipart
+httpx
