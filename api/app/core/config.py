@@ -28,3 +28,15 @@ ENV_PATH = os.path.join(BASE_DIR, ".env")
 
 def reload_env() -> None:
     load_dotenv(ENV_PATH, override=True)
+
+# -------------------------------
+# Geocoding (lat/lon)
+# -------------------------------
+# Provider par défaut :
+# - "ban" => https://api-adresse.data.gouv.fr (France, gratuit, sans clé)
+# - "nominatim" => OpenStreetMap (attention aux limites d'usage)
+GEOCODING_PROVIDER = os.getenv("GEOCODING_PROVIDER", "ban")
+GEOCODING_API_KEY = os.getenv("GEOCODING_API_KEY", "")
+GEOCODING_TIMEOUT_SECONDS = float(os.getenv("GEOCODING_TIMEOUT_SECONDS", "8"))
+GEOCODING_USER_AGENT = os.getenv("GEOCODING_USER_AGENT", "mimicom/1.0 (contact: you@example.com)")
+GEOCODING_CONCURRENCY = int(os.getenv("GEOCODING_CONCURRENCY", "5"))

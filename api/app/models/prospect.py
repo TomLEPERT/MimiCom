@@ -47,6 +47,10 @@ class ProspectBase(BaseModel):
     ville: Optional[str] = Field(default=None, max_length=120)
     adresse: Optional[str] = Field(default=None, max_length=300)
 
+    # Géolocalisation
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lon: Optional[float] = Field(default=None, ge=-180, le=180)
+
     nb_aderents: Optional[int] = Field(default=None, ge=0)
 
     facebook: Optional[str] = Field(default=None, max_length=300)
@@ -148,6 +152,30 @@ class ProspectBase(BaseModel):
                 return int(s)
 
         raise ValueError("Input should be a valid integer")
+
+    # -------------------------
+    # Parse floats (lat/lon) depuis CSV
+    # -------------------------
+    @field_validator("lat", "lon", mode="before")
+    @classmethod
+    def parse_optional_float(cls, v: Any) -> Optional[float]:
+        if v is None:
+            return None
+        if isinstance(v, bool):
+            raise ValueError("Input should be a valid float")
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, str):
+            s = v.strip()
+            if s == "" or s.lower() in {"none", "null", "nan"}:
+                return None
+            # virgule décimale -> point
+            s = s.replace(",", ".")
+            try:
+                return float(s)
+            except ValueError:
+                raise ValueError("Input should be a valid float")
+        raise ValueError("Input should be a valid float")
 
     # -------------------------
     # Normalise type_prospect (Editeur -> Éditeur, Asso jdr -> Asso JDR)
