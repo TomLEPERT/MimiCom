@@ -7,6 +7,8 @@ from .db.indexes import ensure_prospects_indexes, ensure_logs_indexes
 from .routers.prospects import router as prospects_router
 from .routers.imports import router as import_router
 from .routers.login import router as auth_router
+from .routers.kpis import router as kpis_router
+
 
 
 # Crée une instance de l'application FastAPI
@@ -19,6 +21,7 @@ app.include_router(health_router)
 app.include_router(prospects_router)
 app.include_router(import_router)
 app.include_router(auth_router)
+app.include_router(kpis_router)
 
 
 # Startup : création des index
