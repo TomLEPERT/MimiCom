@@ -5,6 +5,9 @@ from components.prospects_table import render_prospects_table
 from components.prospect_card import render_prospect_card
 from components.prospect_inline_edit import render_prospect_inline_edit
 from components.prospects_filters import render_prospects_filters
+from components.sidebar import show_sidebar
+from components._settings import settings
+
 
 if not st.session_state.get("authenticated"):
     st.switch_page("main.py")
@@ -15,6 +18,30 @@ if not st.session_state.get("authenticated"):
 st.set_page_config(page_title="BDD Prospects", layout="wide")
 st.title("Base de données prospects")
 
+show_sidebar()
+# # SETTINGS
+# ------------------------------------------------------------
+# --- INITIALISATION ---
+if "bdd_mode" not in st.session_state:
+    st.session_state.bdd_mode = "list"
+
+# --- AFFICHAGE ---
+
+if st.session_state.get("bdd_mode") == "settings":
+    st.divider()
+    
+    # Centrage
+    col_left, col_center, col_right = st.columns([1, 2, 1])
+        
+    with col_center:
+        settings() 
+        
+        if st.button("Retour visualisation_BDD", use_container_width=True):
+            st.session_state.bdd_mode = "list"
+            st.rerun()
+
+    st.stop()
+    
 # Bouton
 st.page_link("pages/Ajouter_Prospect.py", label="Ajouter un prospect")
 st.page_link("pages/Imports.py", label="Import CSV")
@@ -217,3 +244,5 @@ if st.session_state.bdd_edit_id:
     if edit_action == "cancel":
         stop_edit()
         st.rerun()
+
+

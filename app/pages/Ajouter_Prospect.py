@@ -9,6 +9,7 @@ from utils.constants import (
     PAYS_OPTIONS,
     METHODE_CONTACT_OPTIONS,
 )
+from components.sidebar import show_sidebar
 
 if not st.session_state.get("authenticated"):
     st.switch_page("main.py")
@@ -22,6 +23,9 @@ st.set_page_config(
 )
 
 st.title("Ajouter un prospect")
+
+# on appelle la sidebar
+show_sidebar()
 
 # ------------------------------------------------------------
 # Session state (gestion doublon + reset)
@@ -214,3 +218,5 @@ if st.session_state.pending_conflict:
                 st.session_state.pending_conflict = None
                 reset_form()
                 st.rerun()
+                
+

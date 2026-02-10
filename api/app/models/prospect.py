@@ -82,6 +82,14 @@ class ProspectBase(BaseModel):
     date_dernier_contact: Optional[date] = None
 
     commentaires: Optional[str] = None
+    
+    # -------------------------
+    # Géocodage (optionnel)
+    # -------------------------
+    geocode_status: Optional[str] = None        # ok / failed
+    geocode_error: Optional[str] = None         # no_result / api_error / etc
+    geocode_label: Optional[str] = None         # adresse normalisée
+    geocode_provider: Optional[str] = None      # ban / nominatim / google
 
     # -------------------------
     # Normalisation textes

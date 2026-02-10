@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Tuple
 from services.request import request
 
+
 def auth_login(username: str, password: str) -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
     return request(
         "POST",
