@@ -48,13 +48,11 @@ def get_prospects_kpis(
 
         response.raise_for_status()
 
-        # ✅ ALWAYS return tuple
         return response.json(), None
 
     except Exception as e:
         logger.exception("KPI API failed")
 
-        # ✅ ALWAYS return tuple
         return None, {"message": str(e)}
 
 
