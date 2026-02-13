@@ -1,0 +1,8 @@
+streamlit>=1.37
+requests
+python-dotenv
+matplotlib
+pandas
+seaborn
+streamlit-folium
+squarify

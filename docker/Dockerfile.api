@@ -1,0 +1,31 @@
+# Image de base : Python 3.11 version "slim"
+# → version légère de Python, plus rapide à télécharger
+FROM python:3.11-slim
+
+# Définit le dossier de travail à l’intérieur du conteneur
+# Toutes les commandes suivantes s’exécuteront depuis /code
+WORKDIR /code
+
+# Copie le fichier requirements.txt de l'API dans le conteneur
+# On fait ça AVANT de copier tout le code pour profiter du cache Docker
+# (si requirements.txt ne change pas, Docker ne réinstalle pas les libs)
+COPY api/requirements.txt /code/requirements.txt
+
+# Installe toutes les dépendances Python nécessaires à l’API
+# --no-cache-dir évite de stocker des fichiers temporaires inutiles
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copie tout le code de l’API dans le conteneur
+# (dossier api/ local → dossier /code/ dans le conteneur)
+COPY api/ /code/
+
+# Indique que l’application va écouter sur le port 8000
+# (pure info pour Docker, ça n’ouvre pas vraiment le port)
+EXPOSE 8000
+
+# Commande lancée automatiquement au démarrage du conteneur
+# - uvicorn : serveur web pour FastAPI
+# - app.main:app : fichier app/main.py, variable "app"
+# - --host=0.0.0.0 : rend l’API accessible depuis l’extérieur du conteneur
+# - --port=8000 : port utilisé par l’API
+CMD ["uvicorn", "app.main:app", "--host=0.0.0.0", "--port=8000"]
