@@ -29,6 +29,10 @@ class ProspectType(str, Enum):
     BOUTIQUE_SPECIALISEE = "Boutique spécialisée"
     LUDOTHEQUE = "Ludothèque"
 
+class StatutType(str, Enum):
+    PROSPECT = "Prospect"
+    INTERESSE = "Intéressé"
+    CONTACTE = "Contacté"
 
 class ProspectBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -70,6 +74,7 @@ class ProspectBase(BaseModel):
 
     sit_web: Optional[str] = Field(default=None, max_length=300)
 
+    statut: Optional[StatutType] = Field(default=StatutType.PROSPECT, max_length=50)
     accepte_contact: bool = False
     methode_contact: Optional[str] = Field(default=None, max_length=50)
 
@@ -103,6 +108,7 @@ class ProspectBase(BaseModel):
         "tictok",
         "youtube",
         "sit_web",
+        "statut",
         "methode_contact",
         "commentaires",
         mode="before",

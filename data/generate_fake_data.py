@@ -21,7 +21,7 @@ DUP_TEL_RATE = 0.06     # 6%
 EMAIL_PRESENT_RATE = 0.95
 TEL_PRESENT_RATE = 0.90
 
-OUT_PATH = "data/fake_prospects_dataset_5k.csv"
+OUT_PATH = "data/fake_prospects_dataset_5k_bis.csv"
 
 TYPES_ENUM = [
     "CSCS",
@@ -248,6 +248,7 @@ for _ in range(NB_ROWS):
 
         "sit_web": maybe(fake.url(), 0.80),
 
+        "statut": random.choice(["Intéressé", "Contacté", "Prospect"]),
         "accepte_contact": random.choice([True, False]),
         "methode_contact": maybe(random.choice(["email", "telephone", "instagram", "facebook"]), 0.60),
 
