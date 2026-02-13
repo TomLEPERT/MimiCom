@@ -50,4 +50,4 @@ def render_login() -> None:
         st.session_state["time_out"] = time.time()
         
         st.success("Connecté")
-        st.switch_page("pages/Visualisation_BDD.py")
+        st.rerun()

@@ -11,14 +11,14 @@ def show_sidebar():
 
     # Contenu de la sidebar si connecté
     with st.sidebar:
-        st.write(f"{st.session_state.get('username', '')}")
+        st.divider()
+        st.write(f"**{st.session_state.get('username', '')}**")
         
         if st.button("Se déconnecter" , key="btn_logout_sidebar"):
             # Logique de déconnexion
             st.session_state["authenticated"] = False
             st.rerun() # Relance l'app pour revenir au formulaire de login
 
-        st.sidebar.divider()
         if st.sidebar.button("⚙️ Settings", key="btn_settings_sidebar"):
             # On définit le mode sur settings
             st.session_state.bdd_mode = "settings"
@@ -30,4 +30,3 @@ def show_sidebar():
             except:
             # Si on est déjà sur la page, le switch_page peut être ignoré ou géré par le rerun
                 st.rerun()
-    
