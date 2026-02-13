@@ -13,7 +13,7 @@ from views.Kpis_Prospects import kpis_prospects
 # -------------------------------------------------
 st.set_page_config(
     page_title="Mimicom",
-    layout="centered"
+    layout="wide"
 )
 
 

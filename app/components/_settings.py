@@ -1,10 +1,10 @@
 import streamlit as st
 from services.auth_api import auth_update
+import time
 
 # ------------------------------------------------------------
 # SETTINGS (Modification Identifiants)
 # ------------------------------------------------------------
-import streamlit as st
 
 def settings():
     # On affiche directement le formulaire 
@@ -43,6 +43,7 @@ def settings():
             # Dans votre service request, le succès est confirmé si success_data n'est pas None
             if success_data is not None:
                 st.success("Identifiants mis à jour !")
+                time.sleep(2)
                 st.session_state.clear()
                 st.switch_page("main.py")
             else:

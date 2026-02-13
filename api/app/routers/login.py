@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, HTTPException
 from ..models.login import LoginPayload, UpdateCredsPayload
 from .env_store import get_creds, update_creds
@@ -27,6 +28,8 @@ def update(payload: UpdateCredsPayload):
     if not payload.new_username or not payload.new_password:
         raise HTTPException(status_code=400, detail="New credentials cannot be empty")
     
-    update_creds = (payload.new_username, payload.current_password)
+    update_creds = (payload.new_username, payload.new_password)
+    os.environ["APP_USERNAME"] = payload.new_username
+    os.environ["APP_PASSWORD"] = payload.new_password
     
     return {"ok": True}
