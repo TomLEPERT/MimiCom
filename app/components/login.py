@@ -28,26 +28,35 @@ def time_out():
             st.session_state["time connexion"] = time.time()
 
 def render_login() -> None:
-    st.title("Connexion")
-        
-    with st.form("login_form"):
-        username = st.text_input("Identifiant")
-        password = st.text_input("Mot de passe", type="password")
-        submitted = st.form_submit_button("Se connecter")
     
-    if not submitted:
-        return
-    
-    data, error = auth_login(username, password)
-    
-    if error:
-        st.error(error["message"])
-        return
-    
-    else:
-        st.session_state["authenticated"] = True
-        st.session_state["username"] = username
-        st.session_state["time_out"] = time.time()
-        
-        st.success("Connecté")
-        st.rerun()
+    st.markdown("<h1 style='display:none;'>Connexion à MimiCom</h1>", unsafe_allow_html=True)
+    st.set_page_config(
+        page_title="Mimicom - Connexion",
+        layout="wide"
+    )
+    col_left, col_center, col_right = st.columns([2, 2, 2])
+    with col_center:
+        with st.container(width='stretch', horizontal_alignment="center", vertical_alignment="center"):
+            st.markdown("<h2 style='text-align: center;'>Connexion à MimiCom</h2>", unsafe_allow_html=True)
+            with st.container(width='stretch', height='stretch', horizontal_alignment="center"):
+                with st.form("login_form"):
+                    username = st.text_input("Identifiant")
+                    password = st.text_input("Mot de passe", type="password")
+                    submitted = st.form_submit_button("Se connecter")
+                
+                if not submitted:
+                    return
+                
+                data, error = auth_login(username, password)
+                
+                if error:
+                    st.error(error["message"])
+                    return
+                
+                else:
+                    st.session_state["authenticated"] = True
+                    st.session_state["username"] = username
+                    st.session_state["time_out"] = time.time()
+                    
+                    st.success("Connecté")
+                    st.rerun()

@@ -20,7 +20,7 @@ def ajouter_prospect():
     # ------------------------------------------------------------
     st.set_page_config(
         page_title="Ajouter un prospect",
-        layout="centered",
+        layout="wide",
     )
 
     st.title("Ajouter un prospect")

@@ -1,5 +1,5 @@
 from typing import Any, Dict, List
-from utils.normalizers import normalize_email_for_db, normalize_phone_for_db
+from .normalizers import normalize_email_for_db, normalize_phone_for_db
 
 async def find_duplicates_for_payloads(col, payloads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     duplicates = []
